@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+	<title>Borg.Box - Mods Manager</title>
+
+	<meta name="description" content="Borg.Box — interactive Borg-styled neural network interface (PWA), based on borg-html-sdk.">
+	<meta name="theme-color" content="#0a0a0a">
+	<meta name="color-scheme" content="dark">
+
+	<link rel="manifest" href="manifest.webmanifest">
+	<link rel="icon" href="favicon.ico" sizes="any">
+	<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+	<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+	<meta name="apple-mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+	<meta name="apple-mobile-web-app-title" content="Borg.Box">
+
+	<link rel="stylesheet" href="css/main.css?v=260">
+</head>
+<body>
+
+<!-- Boot-Ladeanimation (siehe main.js playBootIntro): laeuft einmalig beim Seitenstart, mind. 3s,
+     Hintergrund dahinter wird per backdrop-filter verwischt. Wuerfel (icons/core-cube-boot.svg)
+     dreht sich prozedural immer schneller (JS-rAF, siehe playBootIntro), geht per Crossfade in die
+     Kugel (icons/core-cube-sphere.svg, dieselbe Datei wie die Hub-Ikone) ueber, waehrenddessen
+     wird #bootGlow von eckig zu rund und waechst bis er den ganzen Bildschirm ausfuellt - danach
+     blendet das ganze Overlay aus und entfernt sich selbst. -->
+<div id="bootOverlay">
+	<div id="bootGlow"></div>
+	<div id="bootIconWrap">
+		<div id="bootCube" class="boot-icon"></div>
+		<div id="bootSphere" class="boot-icon"></div>
+	</div>
+</div>
+
+<!-- Sprachauswahl-Bildschirm (siehe main.js openLanguageScreen/closeLanguageScreen) - eigener,
+     komplett verdunkelnder Overlay wie #bootOverlay, geoeffnet per Klick auf den Ecken-Knoten
+     (main.js cornerNode). #langNodesContainer wird bei jedem Oeffnen komplett neu befuellt (siehe
+     buildLangScreenNodes) - ein grosser Kreis fuer jede in I18N_PACKS vorbereitete Sprache, driftend
+     und zur Mitte gezogen, ohne Aeste/Tooltips/Zentrum (Nutzerwunsch). Klick auf den dunklen
+     Hintergrund selbst (nicht auf einen Kreis) schliesst den Bildschirm wieder ohne Auswahl. -->
+<div id="langOverlay">
+	<svg viewBox="0 0 1000 800" class="neural-svg" id="langSvg">
+		<g id="langNodesContainer" filter="url(#glow)" class="interactive-node"></g>
+	</svg>
+</div>
+
+<!-- Uebergangs-Aufblitzen beim Oeffnen des Sprachauswahl-Bildschirms (siehe main.js
+     playLangScreenTransition) - dieselbe Idee wie #bootGlow (klein -> deckt per scale() den ganzen
+     Bildschirm ab -> blendet aus), aber mit dem Ecken-Knoten als Ursprung statt der Bildschirmmitte.
+     Eigenes, von #langOverlay UNABHAENGIGES Element (nicht dessen Kind) - dessen eigene
+     opacity-Ueberblendung soll die Glut-Animation nicht mitueberlagern. -->
+<div id="langTransitionGlow"></div>
+
+<div class="interface-container">
+	<div class="status-log" id="statusLog">
+		<div class="status-log-version" id="statusLogVersion"></div>
+		<div class="status-log-entries" id="statusLogEntries"></div>
+	</div>
+	<div class="grid"></div>
+	<div class="starfield"></div>
+
+	<svg viewBox="0 0 1000 800" class="neural-svg" id="neuralNet">
+		<defs>
+			<filter id="glow"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+			<radialGradient id="nodePulseGradient"><stop offset="0%" stop-color="#80ff7a"/><stop offset="50%" stop-color="#4eff44"/><stop offset="100%" stop-color="#080a08"/></radialGradient>
+			<!-- "Доступно обновление" (siehe main.js reconcileBranchTipForModId) - selbe Struktur wie
+			     nodePulseGradient, nur Gelbtoene statt Gruentoene. -->
+			<radialGradient id="nodePulseGradientYellow"><stop offset="0%" stop-color="#fff9a0"/><stop offset="50%" stop-color="#ffd21a"/><stop offset="100%" stop-color="#080a08"/></radialGradient>
+			<!-- "Neuere Version verfuegbar" fuer eine BEREITS installierte/verbundene Mod-Branche
+			     (siehe main.js reconcileBranchTipForModId) - Nutzerwunsch: bewusst bierueguen statt
+			     gelb (gelb ist am Hub-Kreis inzwischen anders belegt, siehe .hub-warn/nodePulseGradientYellow
+			     hier bleibt sie fuer andere Zwecke frei), selbe Struktur wie die anderen Gradienten. -->
+			<!-- Nutzerwunsch: "синие моды... нужно подсвечивать ярче чтобы они были заметнее" - hellere
+			     Stopps UND ein spaeterer Abfall ins Dunkle (70% statt 50%), damit die gesaettigte Farbe
+			     einen groesseren Teil des Kreises fuellt statt frueh in den Hintergrund auszulaufen.
+			     Zusaetzlich .node-update-available (main.css/applyModNodeColor) fuer Glow+Puls. -->
+			<radialGradient id="nodePulseGradientTurquoise"><stop offset="0%" stop-color="#e6fffc"/><stop offset="70%" stop-color="#3df9ec"/><stop offset="100%" stop-color="#0b3f3c"/></radialGradient>
+			<!-- Fehlgeschlagene lokale Validierung des heruntergeladenen Mod-Pakets (siehe main.js
+			     setModNodeValidationError/applyModNodeColor) - selbe Struktur, Rottoene statt Gruen/Gelb. -->
+			<radialGradient id="nodePulseGradientRed"><stop offset="0%" stop-color="#ffb0a8"/><stop offset="50%" stop-color="#ff4444"/><stop offset="100%" stop-color="#080a08"/></radialGradient>
+			<!-- Hub-Icon (Borg-Sphaere, von Nutzer bereitgestellt): dessen schwarze Tinte IST
+			     bereits die gewuenschten duennen Konturlinien (kein Alpha-Invert noetig). Das
+			     frueher zusaetzliche statische Vordergrund-Emblem (Star-Trek-Delta) wurde
+			     entfernt (siehe main.js createCoreIconGroup) - nur noch diese eine, rotierende
+			     Ebene. -->
+			<mask id="coreGearMask" mask-type="alpha" maskUnits="userSpaceOnUse" x="-219" y="-219" width="438" height="438">
+				<image href="icons/core-cube-sphere.svg" x="-219" y="-219" width="438" height="438"/>
+			</mask>
+			<!-- Icon-Masken pro Mod-Branche werden jetzt zur Laufzeit dynamisch erzeugt (main.js
+			     initInterface, ein <mask> mit data:-URI-Bildquelle pro Branche, id "dynIconMask_N") -
+			     Bildquelle ist node.modMeta.icon aus dem Katalog statt einer festen Datei hier. Ersetzt
+			     die vorherigen 11 statischen #tipIconMask.."#tipIconMask11"-Eintraege (je an eine feste
+			     Datei/Franchise gebunden, u.a. Transformers/Hasbro-Markenzeichen - das Problem loest
+			     sich mit der Entfernung von selbst, siehe Git-Historie). -->
+			<!-- Icon fuer den assemblyNode-Kreis (siehe main.js assemblyIconEl) - gleiches Prinzip wie
+			     #tipIconMask, aber Box-Groesse aus CORNER_NODE_R * ASSEMBLY_ICON_FIT_FACTOR (60 * 1.75
+			     = 105, Halbwert 52.5) statt SIZE_LARGE, da der assemblyNode ein eigenstaendiger Knoten
+			     mit eigenem Referenzradius ist, kein Teil von config.nodes. AENDERT SICH CORNER_NODE_R
+			     oder der Faktor in main.js, muss diese Maske manuell nachgezogen werden. -->
+			<mask id="assemblyIconMask" mask-type="alpha" maskUnits="userSpaceOnUse" x="-52.5" y="-52.5" width="105" height="105">
+				<image href="icons/assembly-icon.svg" x="-52.5" y="-52.5" width="105" height="105"/>
+			</mask>
+			<!-- Icon fuer den ticketNode-Kreis (siehe main.js ticketIconEl) - Nutzerwunsch: eigenes
+			     Icon (icons/log-module-icon.svg) statt bisher #assemblyIconMask mitzunutzen. Gleiches
+			     Prinzip/gleiche Box-Groesse wie #assemblyIconMask oben. -->
+			<mask id="ticketIconMask" mask-type="alpha" maskUnits="userSpaceOnUse" x="-52.5" y="-52.5" width="105" height="105">
+				<image href="icons/log-module-icon.svg" x="-52.5" y="-52.5" width="105" height="105"/>
+			</mask>
+		</defs>
+
+		<g id="radarContainer"></g>
+		<g id="pathsContainer" stroke="#4eff44" fill="none" stroke-width="3" filter="url(#glow)" opacity="0.4">
+		</g>
+		<g id="pulseContainer"></g>
+		<!-- Verbindungslinie zur Hover-Sprechblase (siehe main.js updateHoverTooltipPosition) - liegt
+		     bewusst VOR #nodesContainer: laeuft zwar bis zum exakten Knotenmittelpunkt (Nutzerwunsch:
+		     von der Mitte des Kreises ausgehen), aber der Knoten selbst (als spaeteres Element)
+		     uebermalt den Teil der Linie, der innerhalb seines Kreises liegt - die Linie wirkt dadurch,
+		     als kaeme sie von HINTER dem Kreis hervor, statt sichtbar mitten durch ihn zu laufen. Die
+		     Sprechblase selbst bleibt trotzdem obenauf, da sie als HTML-Element ohnehin erst NACH dem
+		     kompletten SVG im DOM folgt. Farbe/Fill/Gluehen kommen komplett von .hover-tooltip-connector
+		     (siehe main.css), nicht von einer vererbenden Elterngruppe (frueher #pathsContainer, dessen
+		     group-opacity="0.4" sie zusaetzlich abdunkelte). Leer/unsichtbar (kein 'd'), solange keine
+		     Sprechblase aktiv ist. -->
+		<path id="hoverTooltipPath" class="hover-tooltip-connector" fill="none" d="" opacity="0"/>
+		<g id="nodesContainer" filter="url(#glow)" class="interactive-node"></g>
+	</svg>
+
+	<div id="infoPanel" class="info-panel">
+		<div class="info-panel-header" id="infoPanelHeader">
+			<div id="infoTitle" class="info-panel-title"></div>
+			<!-- Reiner Schliessen-Knopf OHNE jede weitere Aktion (Nutzerwunsch: die vorherige
+			     "ОТКЛЮЧИТЬ"-Schaltflaeche unten hat nie mehr getan als das Panel zu schliessen -
+			     das macht jetzt dieses Kreuz, an derselben Stelle wie beim Markdown-Vorschau-Overlay,
+			     siehe #mdPreviewCloseBtn weiter unten). Die eigentliche Installieren/Отключить-Aktion
+			     sitzt jetzt in #panelActionBtn (siehe main.js renderPanelActionButton). -->
+			<button class="info-panel-close" onclick="closePanel()">&times;</button>
+		</div>
+		<div id="infoText" style="font-size: 14px; line-height: 1.5; white-space: pre-line;"></div>
+		<!-- Nutzerwunsch: "опусти закладки под краткое описание и автора, и объедини линии" - Reiter
+		     jetzt UNTERHALB von #infoText (Beschreibung+Autor), nicht mehr in der Kopfzeile - die
+		     Kopfzeile ist wieder einzeilig (Titel+Kreuz). main.js initModDownloadField blendet die
+		     Reiterzeile ein/aus und tauscht ihre Klick-Handler pro Mod-Knoten aus. -->
+		<div class="mod-doc-tabs" id="modPanelTabs" hidden>
+			<button class="mod-doc-tab" id="modTabInstallBtn"></button>
+			<button class="mod-doc-tab" id="modTabReadmeBtn"></button>
+			<button class="mod-doc-tab" id="modTabChangelogBtn"></button>
+		</div>
+		<!-- Nur beim zentralen Hub befuellt (siehe main.js openPanel/initGameFolderPicker) - Auswahl
+		     des STFC-Client-Ordners ueber die File System Access API, Pfad per IndexedDB gemerkt. -->
+		<div id="infoPanelExtra" class="info-panel-extra"></div>
+		<!-- Nur fuer echte Katalog-Knoten sichtbar (node.modMeta, siehe main.js renderPanelActionButton) -
+		     genau EINE Schaltflaeche, Text/Aktion je nach Installationsstand dieser Version. -->
+		<button id="panelActionBtn" class="panel-action-btn" hidden></button>
+		<div id="infoPanelActionStatus" class="panel-action-status"></div>
+	</div>
+
+	<!-- Markdown-Vorschau (siehe main.js renderMarkdownToHtml/openMarkdownPreview) - eigenstaendiges
+	     Overlay UEBER dem Panel selbst (nicht darin eingebettet), damit die Vorschau bequem
+	     abgedeckt/geschlossen werden kann, ohne den WIP-Formularzustand des Sammel-Knotens
+	     (initAssemblyManifestField) zu beruehren. Wird spaeter genauso fuer die Instruktionen ECHTER
+	     Mod-Knoten (Baum-Aeste mit Icon) wiederverwendet, nicht nur fuer die Vorschau hier. -->
+	<div id="mdPreviewOverlay" class="md-preview-overlay">
+		<div class="md-preview-panel">
+			<div class="md-preview-header">
+				<div class="md-preview-title" id="mdPreviewTitle"></div>
+				<button class="md-preview-close" id="mdPreviewCloseBtn" onclick="closeMarkdownPreview()">&times;</button>
+			</div>
+			<div class="md-preview-content md-content" id="mdPreviewContent"></div>
+		</div>
+	</div>
+
+	<!-- Kompakte Hover-Sprechblase (siehe main.js hoverTooltipNodeId/playTooltipReveal) -
+	     inhaltlich wie #infoPanel (Titel+Text desselben Knotens), erscheint aber erst NACH dem
+	     Aufleuchten der Branche (siehe highlightPathTrace), mit gezeichneter Rahmen-Animation
+	     (SVG stroke-dashoffset) und einer Buchstaben-fuer-Buchstaben "Borg-Entschluesselung" statt
+	     einfachem Ein-/Ausblenden. -->
+	<div id="hoverTooltip" class="hover-tooltip">
+		<svg class="hover-tooltip-border-svg" viewBox="0 0 220 100" preserveAspectRatio="none">
+			<rect class="hover-tooltip-border-rect" x="1" y="1" width="218" height="98" rx="6"/>
+		</svg>
+		<div id="hoverTooltipTitle" class="hover-tooltip-title"></div>
+		<div id="hoverTooltipText" class="hover-tooltip-text"></div>
+	</div>
+</div>
+
+<div class="borg-script right-row">
+	<div class="glyph"><span class="char-arc left"></span></div>
+	<div class="glyph layout-toggle" id="layoutToggleBtn" title="Переключить режим отображения"><span class="char-circle pulse"></span></div>
+	<div class="glyph"><span class="char-arc right"></span><span class="char-dot"></span></div>
+</div>
+
+<script src="config.js?v=317"></script>
+<script src="js/native-io.js?v=317"></script>
+<script src="js/main.js?v=317"></script>
+<script src="js/shortcuts.js?v=317"></script>
+<script>
+	if ("serviceWorker" in navigator) {
+		window.addEventListener("load", () => {
+			navigator.serviceWorker.register("service-worker.js").catch((err) => {
+				console.warn("Borg.Box: service worker registration failed", err);
+			});
+		});
+	}
+</script>
+</body>
+</html>

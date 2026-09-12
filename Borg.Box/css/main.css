@@ -1,0 +1,1612 @@
+:root {
+	--borg-green: #4eff44;
+	--dark-bg: #080a08;
+	--panel-bg: rgba(8, 15, 8, 0.95);
+}
+
+@font-face {
+	font-family: borg;
+	src: url("borg.ttf");
+}
+
+body, html {
+	margin: 0;
+	padding: 0;
+	width: 100%;
+	height: 100%;
+	background: var(--dark-bg);
+	overflow: hidden;
+	font-family: 'Courier New', monospace;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+}
+
+/* Boot-Ladeanimation (siehe main.js playBootIntro) - Layout/Timing-Details siehe dort. */
+#bootOverlay {
+	position: fixed;
+	inset: 0;
+	z-index: 1000;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--dark-bg);
+	transition: opacity 0.5s ease;
+}
+
+#bootOverlay.boot-fading {
+	opacity: 0;
+	pointer-events: none;
+}
+
+/* Sprachauswahl-Bildschirm (siehe main.js openLanguageScreen) - dieselbe komplett verdunkelnde
+   Overlay-Behandlung wie #bootOverlay (volldeckender --dark-bg statt nur abgedunkelt, per Klasse
+   ein-/ausgeblendet statt per JS-Style), nur nicht automatisch beim Laden sichtbar, sondern erst
+   nach einem Klick auf den Ecken-Knoten. */
+#langOverlay {
+	position: fixed;
+	inset: 0;
+	z-index: 900;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--dark-bg);
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 0.4s ease;
+}
+
+#langOverlay.lang-active {
+	opacity: 1;
+	pointer-events: auto;
+}
+
+/* Uebergangs-Aufblitzen beim Oeffnen (siehe main.js playLangScreenTransition) - gleiche Optik wie
+   #bootGlow (radial-gradient, per scale() von klein auf bildschirmdeckend), aber Position/Groesse
+   werden VON JS gesetzt (Ursprung = aktuelle Bildschirmposition des Ecken-Knotens), nicht per
+   Flexbox-Zentrierung wie beim Boot-Glow. position:fixed + eigener z-index (ueber #langOverlay,
+   unter #bootOverlay) - unabhaengig von #langOverlay, damit dessen eigene opacity-Ueberblendung
+   die Skalierungs-Animation hier nicht mitverzerrt. */
+#langTransitionGlow {
+	position: fixed;
+	left: 0;
+	top: 0;
+	width: 0;
+	height: 0;
+	border-radius: 50%;
+	background: radial-gradient(circle, var(--borg-green) 0%, rgba(78, 255, 68, 0.5) 45%, transparent 72%);
+	opacity: 0;
+	pointer-events: none;
+	z-index: 950;
+	will-change: transform;
+}
+
+/* Namens-Label auf den grossen Sprach-Kreisen (siehe main.js makeLangScreenNode) - selbe
+   dunkle-Fuellung-auf-hellem-Verlauf-Logik wie .corner-node-label, aber ohne feste font-size (die
+   setzt main.js pro Kreis direkt als Attribut, je nach Kreisgroesse - gross fuer die Sprachnamen,
+   kleiner fuer die vielen dekorativen Kreise). */
+.lang-node-label {
+	font-family: 'Courier New', monospace;
+	font-weight: bold;
+	fill: #04170a;
+	text-shadow: 0 0 3px rgba(255, 255, 255, 0.55);
+	pointer-events: none;
+	user-select: none;
+}
+
+/* Weicher Rand per radial-gradient statt filter:blur() - ein blur-Filter wird bei jeder
+   scale()-Aenderung ueber die dann bereits bildschirmgrosse Flaeche komplett neu gerastert (siehe
+   .boot-flash), das war der Hauptgrund fuer sichtbares Ruckeln. Ein Gradient ist dagegen analytisch
+   und bleibt bei jeder Groesse guenstig. */
+#bootGlow {
+	position: absolute;
+	border-radius: 0;
+	background: radial-gradient(circle, var(--borg-green) 0%, rgba(78, 255, 68, 0.5) 45%, transparent 72%);
+	opacity: 0.22;
+	transition: border-radius 0.55s ease, opacity 0.5s ease;
+	will-change: transform;
+}
+
+#bootGlow.boot-round {
+	border-radius: 50%;
+}
+
+#bootGlow.boot-flash {
+	opacity: 0.95;
+	transition: transform 1.05s cubic-bezier(0.3, 0, 0.6, 1), opacity 1.05s ease, border-radius 0.55s ease;
+}
+
+#bootIconWrap {
+	position: relative;
+	/* Foerdert das Element auf eine eigene Compositor-Ebene, damit die rotierende Transform-
+	   Aenderung jeden Frame NICHT die teure Masken+Drop-Shadow-Rasterung der Kind-Icons neu
+	   ausloest (sonst wird das grosse, detailreiche Wuerfel-SVG bei jedem Grad neu gerendert). */
+	will-change: transform;
+}
+
+.boot-icon {
+	position: absolute;
+	inset: 0;
+	background: var(--borg-green);
+	-webkit-mask-size: contain;
+	mask-size: contain;
+	-webkit-mask-repeat: no-repeat;
+	mask-repeat: no-repeat;
+	-webkit-mask-position: center;
+	mask-position: center;
+	filter: drop-shadow(0 0 12px var(--borg-green));
+	opacity: 1;
+	transition: opacity 0.5s ease;
+	/* Waehrend der Wuerfel->Kugel-Ueberblendung sind kurz BEIDE grossen, maskierten Bilder
+	   gleichzeitig teiltransparent sichtbar - ohne diesen Hinweis rastert der Browser den
+	   drop-shadow-Filter (der bei reinem opacity sonst NICHT compositor-only laeuft) fuer beide
+	   jeden Frame neu, was auf schwaecherer Hardware zu einem kurzen Ruckler/Frame-Drop in der
+	   Wuerfel-Drehung genau in diesem Moment fuehren kann (sichtbar als kurzes "Einfrieren" und
+	   anschliessendes Nachholen des Drehwinkels, da der Winkel echtzeitbasiert berechnet wird). */
+	will-change: opacity;
+}
+
+#bootCube { -webkit-mask-image: url("../icons/core-cube-boot.svg"); mask-image: url("../icons/core-cube-boot.svg"); }
+#bootSphere {
+	-webkit-mask-image: url("../icons/core-cube-sphere.svg");
+	mask-image: url("../icons/core-cube-sphere.svg");
+	opacity: 0;
+}
+
+#bootIconWrap.boot-crossfade #bootCube { opacity: 0; }
+#bootIconWrap.boot-crossfade #bootSphere { opacity: 1; }
+
+.interface-container {
+	position: relative;
+	width: 100vw;
+	height: 100vh;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+}
+
+.grid {
+	position: absolute;
+	inset: 0;
+	background-image: linear-gradient(rgba(78, 255, 68, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(78, 255, 68, 0.05) 1px, transparent 1px);
+	background-size: 40px 40px;
+	z-index: -1;
+}
+
+/* Nutzerwunsch: "звёздное небо/галактика/млечный путь на фоне" - statische Basis-Schicht (kein
+   JS, keine Elemente, keine Rotation/Animation - siehe die zusaetzlichen, per JS erzeugten
+   funkelnden Sterne in tickInteraction/createCoreIconGroup fuer die lebendige Ergaenzung dazu).
+   Zwei uebereinandergelegte radial-gradient-Kachel-Ebenen unterschiedlicher Kachelgroesse/Deckkraft
+   fuer ein bisschen Tiefe (entfernte/nahe Sterne), plus eine breite, flache conic-gradient-Bahn als
+   angedeuteter "Milchstrassen"-Streifen quer durchs Bild. Bewusst SEHR gedaempft (die eigentliche
+   Buehne bleibt der gruene Borg-Baum), rein dekorativ, kein pointer-events noetig (liegt eh hinter
+   allem, z-index:-2 - noch hinter .grid). */
+.starfield {
+	position: absolute;
+	inset: 0;
+	z-index: -2;
+	background-image:
+		radial-gradient(1px 1px at 10% 20%, rgba(255,255,255,0.9), transparent),
+		radial-gradient(1px 1px at 70% 65%, rgba(255,255,255,0.7), transparent),
+		radial-gradient(1.5px 1.5px at 40% 85%, rgba(210,255,220,0.8), transparent),
+		radial-gradient(1px 1px at 85% 15%, rgba(255,255,255,0.6), transparent),
+		radial-gradient(1px 1px at 25% 50%, rgba(255,255,255,0.5), transparent),
+		radial-gradient(1.5px 1.5px at 60% 30%, rgba(210,255,220,0.7), transparent),
+		radial-gradient(1px 1px at 90% 75%, rgba(255,255,255,0.8), transparent),
+		radial-gradient(1px 1px at 15% 90%, rgba(255,255,255,0.4), transparent),
+		radial-gradient(1px 1px at 50% 10%, rgba(255,255,255,0.6), transparent),
+		radial-gradient(1px 1px at 5% 60%, rgba(255,255,255,0.5), transparent);
+	background-size: 340px 340px;
+	background-repeat: repeat;
+}
+.starfield::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background-image:
+		radial-gradient(0.8px 0.8px at 20% 40%, rgba(255,255,255,0.35), transparent),
+		radial-gradient(0.8px 0.8px at 80% 20%, rgba(255,255,255,0.3), transparent),
+		radial-gradient(0.8px 0.8px at 45% 75%, rgba(255,255,255,0.25), transparent),
+		radial-gradient(0.8px 0.8px at 65% 55%, rgba(255,255,255,0.3), transparent),
+		radial-gradient(0.8px 0.8px at 10% 80%, rgba(255,255,255,0.2), transparent),
+		radial-gradient(0.8px 0.8px at 92% 60%, rgba(255,255,255,0.3), transparent);
+	background-size: 180px 180px;
+	background-repeat: repeat;
+}
+.starfield::after {
+	content: "";
+	position: absolute;
+	inset: -10%;
+	background: conic-gradient(from 110deg at 60% 35%, transparent 0deg, rgba(180, 220, 255, 0.05) 40deg, rgba(200, 255, 210, 0.07) 70deg, transparent 110deg, transparent 360deg);
+	filter: blur(18px);
+}
+
+/* JS-generierte Sterne (main.js buildStarCircle/createFieldStars/createOrbitStars) - im
+   Unterschied zur rein statischen .starfield-CSS-Schicht funkeln diese individuell. Jeder Stern
+   traegt seine eigene --star-base-opacity (zufaellige "Helligkeit") plus zufaellige
+   animation-duration/-delay (inline per Element, siehe buildStarCircle) - dieselbe Keyframe-Regel
+   reicht darum fuer alle, obwohl kein Stern wie der andere blinkt. pointer-events:none, damit sie
+   nie Klicks auf darunterliegenden Knoten/dem Hub stehlen. */
+.twinkle-star {
+	--star-base-opacity: 0.6;
+	opacity: var(--star-base-opacity);
+	pointer-events: none;
+	animation-name: starTwinkle;
+	animation-timing-function: ease-in-out;
+	animation-iteration-count: infinite;
+}
+@keyframes starTwinkle {
+	0%, 100% { opacity: var(--star-base-opacity); }
+	50% { opacity: calc(var(--star-base-opacity) * 0.25); }
+}
+
+.neural-svg {
+	width: 1000px;
+	height: 800px;
+	overflow: visible;
+}
+
+/* Animationen */
+@keyframes borgBlink {
+	0%, 100% {
+		filter: brightness(0.85) drop-shadow(0 0 4px rgba(78, 255, 68, 0.35));
+	}
+	50% {
+		filter: brightness(1.25) drop-shadow(0 0 9px var(--borg-green));
+	}
+}
+
+.node {
+	transition: filter 0.3s, stroke-width 0.3s;
+	touch-action: none;
+}
+
+.node.clickable {
+	cursor: pointer;
+}
+
+.node.clickable:hover {
+	stroke-width: 4px;
+	filter: brightness(1.8) drop-shadow(0 0 20px var(--borg-green));
+}
+
+/* Eigenstaendiger Ecken-Knoten unten rechts (siehe main.js cornerNode) - kein Teil des Baums,
+   darum eigene Hover-Regel statt .node.clickable (kein Klick, keine Astverbindung). r-Transition
+   fuer das Hover-Wachstum (main.js setzt r direkt per Attribut auf CORNER_NODE_HOVER_R). */
+.corner-node {
+	/* KEINE transition auf r - main.js interpoliert den Radius bereits jeden Frame selbst
+	   (cornerNodeCurrentR/cornerNodeTargetR, gleiches Ease-Prinzip wie nodeHoverState) - eine
+	   zusaetzliche CSS-transition wuerde dagegen ankaempfen und wie ein Ruckeln/Sprung aussehen. */
+	transition: filter 0.2s;
+}
+
+.corner-node:hover {
+	filter: brightness(1.8) drop-shadow(0 0 20px var(--borg-green));
+}
+
+/* Namens-Label auf dem Ecken-Knoten (main.js cornerNodeLabel) - Text statt Bild-Icon wie bei
+   tipIconNode/2/3/4 (Nutzerwunsch). pointer-events:none, damit Hover/Klick weiterhin am
+   darunterliegenden Kreis (.corner-node) ankommen. Dunkle Fuellung + heller Schlagschatten wie bei
+   den (inzwischen entfernten) Tutorial-Kreisen - haelt den Text auch auf dem hellen
+   Verlaufszentrum lesbar. */
+.corner-node-label {
+	font-family: 'Courier New', monospace;
+	font-weight: bold;
+	font-size: 19px;
+	fill: #04170a;
+	text-shadow: 0 0 3px rgba(255, 255, 255, 0.55);
+	pointer-events: none;
+	user-select: none;
+}
+
+/* Alle Knoten einer Branche (nicht nur der gehoverte) leuchten wie die Verbindungslinie -
+   selbe bleich-gruene Farbgebung wie .path-highlight */
+.node-highlight {
+	stroke: #d8ffc9 !important;
+	stroke-width: 3px !important;
+	filter: brightness(1.7) drop-shadow(0 0 14px var(--borg-green)) !important;
+}
+
+/* Nutzerwunsch: "синие моды (которые на ветке идут впереди установленного) нужно подсвечивать ярче
+   чтобы они были заметнее" - Versionen NEUER als die installierte (siehe main.js applyModNodeColor,
+   nodePulseGradientTurquoise). Zusaetzlich zum helleren Farbverlauf ein eigener Glow plus ein
+   langsamer Puls, damit sie im gruenen Baum sofort ins Auge fallen, ohne wie ein Fehler (rot) oder
+   wie der aktive Hover-Zustand auszusehen. */
+.node-update-available {
+	filter: brightness(1.3) drop-shadow(0 0 12px #3df9ec);
+	animation: nodeUpdatePulse 2.4s ease-in-out infinite;
+}
+@keyframes nodeUpdatePulse {
+	0%, 100% { filter: brightness(1.25) drop-shadow(0 0 9px #3df9ec); }
+	50% { filter: brightness(1.55) drop-shadow(0 0 18px #7dfff3); }
+}
+
+.node.draggable {
+	cursor: grab;
+}
+
+.node.dragging {
+	cursor: grabbing;
+	filter: brightness(1.8) drop-shadow(0 0 20px var(--borg-green));
+}
+
+.blink-1 {
+	animation: borgBlink 3.5s infinite;
+}
+
+.blink-2 {
+	animation: borgBlink 4.5s infinite;
+	animation-delay: 1s;
+}
+
+.blink-3 {
+	animation: borgBlink 2.8s infinite;
+	animation-delay: 0.5s;
+}
+
+/* Zentrums-Ikone: traced SVG-Emblem auf gruenem Hintergrundquadrat (siehe main.js) */
+/* --attract (0-1, von main.js pro Frame per style.setProperty gesetzt, siehe gearAttractT) steuert
+   eine STETIGE Auf-/Abblende der Helligkeit waehrend Hover+Halten am Hub - kein einfaches Ein/Aus
+   mehr, das Leuchten baut sich sichtbar auf, je laenger gehovert wird (und klingt beim Verlassen
+   genauso weich wieder ab), synchron zur "Ruf-Geste" (siehe tickInteraction), die dabei alle
+   Knoten zurueckzieht. */
+.core-icon {
+	--attract: 0;
+	/* Glut-Reichweite (drop-shadow-Radius) bei voller Ruf-Geste (--attract=1) auf das 3-fache der
+	   urspruenglichen Werte gestreckt (3px+20px -> 3px+60px, 42px -> 126px) */
+	filter: url(#glow) brightness(calc(1 + var(--attract) * 1.6))
+		drop-shadow(0 0 calc(3px + var(--attract) * 60px) var(--borg-green))
+		drop-shadow(0 0 calc(var(--attract) * 126px) var(--borg-green));
+}
+
+/* Nutzerwunsch: Sphaere rot/gelb einfaerben, je nach Konfigurationszustand des zentralen Moduls
+   (siehe main.js refreshHubDataStatus/setHubNoDataVisible/setHubWarn) - ueberschreibt --borg-green
+   NUR innerhalb von .core-icon (CSS-Custom-Properties vererben sich an alle Nachfahren, die var()
+   nutzen - Fuellung, Glut-Filter, Puls-Ring, NO-DATA-Text/Glyphen faerben sich darum automatisch
+   mit, ohne jede einzelne Regel separat anzufassen). .hub-error hat Vorrang (siehe JS - beide
+   Klassen liegen nie gleichzeitig an). */
+.core-icon.hub-error {
+	--borg-green: #ff4444;
+}
+.core-icon.hub-warn {
+	--borg-green: #ffc24d;
+}
+
+.core-icon-backdrop {
+	fill: var(--borg-green);
+	/* Nutzerbeobachtung: die klickbare Flaeche des Hubs war deutlich groesser als die sichtbare
+	   Sphaere - dieses <rect> ist das VOLLE CORE_ICON_SIZE-Quadrat (main.js createCoreIconGroup),
+	   per mask="url(#coreGearMask)" auf die Icon-Form zurechtgeschnitten. Der Zuschnitt ist rein
+	   optisch: Browser werten fuer pointer-events weiterhin die volle Rect-Geometrie als "painted",
+	   nicht nur den sichtbaren, unmaskierten Teil. pointer-events:none hier laesst Klicks/Hover
+	   durch dieses Rect hindurchfallen - .core-icon-shield (echter Kreis, r=HUB_ICON_VISUAL_RADIUS,
+	   genau die sichtbare Sphaerengroesse) traegt den Klick-Listener (auf dem gemeinsamen <g>,
+	   siehe initInterface) danach ganz von selbst. */
+	pointer-events: none;
+}
+
+/* Icon auf einem einzelnen Endknoten (siehe main.js tipIconNode/tipIconEl) - reagiert nicht auf
+   Maus/Touch, damit Hover/Klick/Drag weiterhin auf dem darunterliegenden Knoten-Kreis landen.
+   Dunkel statt gruen gefuellt (ueberschreibt .core-icon-backdrop) - auf dem hellgruenen
+   Knoten-Farbverlauf ging ein gruenes Icon optisch unter, zu wenig Kontrast. */
+.tip-icon {
+	pointer-events: none;
+	fill: var(--dark-bg) !important;
+}
+
+/* Undurchsichtiger Hintergrund hinter der Ikone - verdeckt den Punkt, an dem alle Pfade
+   zusammenlaufen (sonst durch die groesstenteils transparente maskierte Ikone sichtbar) */
+.core-icon-shield {
+	fill: var(--dark-bg);
+}
+
+/* Pulsierender Glut-Ring um die Sphaere - reine Kontur (kein Fill) an fester Groesse/Position
+   (kein scale() - das sah wie ein zweiter, kurz aufblitzender Ring aus). Pulsiert stattdessen
+   nur ueber die Ausbreitung des Leucht-Gradienten (drop-shadow-Unschaerferadius) + etwas
+   Opacity - wirkt wie ein Atmen der Gluthuelle, nicht wie eine zusaetzliche Kontur. */
+.core-icon-pulse-ring {
+	fill: none;
+	stroke: var(--borg-green);
+	stroke-width: 2px;
+	animation: coreIconPulseRing 3.5s ease-in-out infinite;
+}
+
+@keyframes coreIconPulseRing {
+	0%, 100% {
+		opacity: 0.4;
+		filter: drop-shadow(0 0 4px var(--borg-green));
+	}
+	50% {
+		opacity: 0.9;
+		filter: drop-shadow(0 0 22px var(--borg-green));
+	}
+}
+
+/* "NO DATA"-Signalstoerung auf dem Hub, solange kein STFC-Client-Ordner konfiguriert ist (siehe
+   main.js createHubNoDataOverlay/refreshHubDataStatus) - in der ueblichen Borg-Gruenfarbe (nicht
+   rot), das Sphaeren-Bild selbst wird waehrenddessen per JS ausgeblendet (siehe setHubNoDataVisible). */
+.hub-no-data-overlay {
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 0.4s ease;
+}
+
+.hub-no-data-overlay.visible {
+	opacity: 1;
+}
+
+.hub-no-data-text {
+	font-family: 'Courier New', monospace;
+	font-size: 28px;
+	font-weight: bold;
+	fill: var(--borg-green);
+	letter-spacing: 2px;
+	text-shadow: 0 0 8px var(--borg-green);
+	animation: hubNoDataTextFlicker 2.2s steps(1) infinite;
+}
+
+@keyframes hubNoDataTextFlicker {
+	0%, 100% { opacity: 1; }
+	42% { opacity: 1; }
+	44% { opacity: 0.2; }
+	46% { opacity: 1; }
+	70% { opacity: 1; }
+	71% { opacity: 0.3; }
+	73% { opacity: 1; }
+}
+
+.hub-no-data-glyph {
+	font-family: 'borg', monospace;
+	font-size: 20px;
+	fill: var(--borg-green);
+	opacity: 0;
+	animation-name: hubNoDataGlyphFlicker;
+	animation-iteration-count: infinite;
+	animation-timing-function: steps(2, jump-none);
+}
+
+@keyframes hubNoDataGlyphFlicker {
+	0%, 100% { opacity: 0; }
+	50% { opacity: 0.9; }
+}
+
+/* HUD & UI */
+.info-panel {
+	position: absolute;
+	top: 3%;
+	bottom: 3%;
+	left: 3%;
+	right: 3%;
+	transform: translateX(100%);
+	background: var(--panel-bg);
+	backdrop-filter: blur(10px);
+	border: 1.5px solid var(--borg-green);
+	border-radius: 30px;
+	padding: 25px;
+	color: var(--borg-green);
+	z-index: 100;
+	visibility: hidden;
+	display: flex;
+	flex-direction: column;
+	overflow-y: auto;
+	transition: all 0.4s cubic-bezier(0.17, 0.88, 0.32, 1.28);
+}
+
+.info-panel.active {
+	transform: translateX(0);
+	visibility: visible;
+}
+
+/* Scrollbalken im Borg-Gruen statt der Standard-Browserleiste - Firefox (scrollbar-*) UND
+   WebKit/Blink (::-webkit-scrollbar-*) abgedeckt. margin auf der Track sorgt dafuer, dass der
+   Balken nicht bis in die abgerundeten Ecken des Panels (border-radius:30px) hineinragt. */
+.info-panel {
+	scrollbar-width: thin;
+	scrollbar-color: rgba(78, 255, 68, 0.45) transparent;
+}
+
+.info-panel::-webkit-scrollbar {
+	width: 10px;
+}
+
+.info-panel::-webkit-scrollbar-track {
+	background: transparent;
+	margin: 22px 0;
+}
+
+.info-panel::-webkit-scrollbar-thumb {
+	background-color: rgba(78, 255, 68, 0.45);
+	border-radius: 10px;
+	border: 2px solid transparent;
+	background-clip: padding-box;
+}
+
+.info-panel::-webkit-scrollbar-thumb:hover {
+	background-color: rgba(78, 255, 68, 0.7);
+	background-clip: padding-box;
+}
+
+/* Kompakte Hover-Sprechblase (siehe main.js hoverTooltipNodeId/playTooltipReveal) - erscheint
+   rechts oben vom Knoten (ueberlappt ihn nicht), verbunden per hoverTooltipPath (echte
+   Ast-Verbindung mit Puls, siehe dort). Der Anker (links unten der Box) wird von main.js pro
+   Frame per left/top positioniert. Sichtbarkeit selbst kommt NICHT von hier (kein Ein-/Ausblenden
+   per Opacity/Scale) - die Box erscheint erst als das gezeichnete Rahmen-Rechteck
+   (.hover-tooltip-border-rect) + die Buchstaben-Entschluesselung (.tooltip-char), siehe JS. */
+.hover-tooltip {
+	position: absolute;
+	left: 0;
+	top: 0;
+	width: 320px;
+	background: var(--panel-bg);
+	backdrop-filter: blur(10px);
+	padding: 25px;
+	color: var(--borg-green);
+	z-index: 95;
+	pointer-events: none;
+	visibility: hidden;
+	transform: translate(0, -100%);
+	border-radius: 10px 3px;
+}
+
+.hover-tooltip.active {
+	visibility: visible;
+}
+
+.hover-tooltip-border-svg {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	overflow: visible;
+}
+
+.hover-tooltip-border-rect {
+	fill: none;
+	stroke: var(--borg-green);
+	stroke-width: 1.5px;
+	/* stroke-dasharray/-dashoffset werden von main.js exakt auf den echten Box-Umfang gesetzt
+	   (Groesse variiert mit dem Text) und von dort aus animiert - die Werte hier sind nur ein
+	   Startzustand (komplett ungezeichnet), falls main.js noch nicht gelaufen ist. */
+	stroke-dasharray: 640;
+	stroke-dashoffset: 640;
+}
+
+.hover-tooltip-title,
+.hover-tooltip-text {
+	position: relative;
+}
+
+.hover-tooltip-title {
+	font-size: 20px;
+	font-weight: bold;
+	margin-bottom: 10px;
+	padding-bottom: 5px;
+	border-bottom: 1px solid rgba(78, 255, 68, 0.3);
+}
+
+.hover-tooltip-text {
+	font-size: 14px;
+	line-height: 1.5;
+	/* Nutzerwunsch: eigene Autor-Zeile bei Mod-Knoten (siehe main.js groupCatalogEntriesByMod) - ein
+	   "\n" im Text soll dafuer als echter Zeilenumbruch wirken, nicht wie sonst ueblich zu einem
+	   einzelnen Leerzeichen kollabieren. Wirkt trotz Zeichen-fuer-Zeichen-Zerlegung (buildCharSpans,
+	   viele einzelne <span>s statt eines Text-Knotens) - der Browser wertet erzwungene Umbrueche
+	   anhand der tatsaechlichen Zeichenfolge im Inline-Fluss aus, unabhaengig davon, in welchem
+	   einzelnen Element ein Zeichen steckt. */
+	white-space: pre-line;
+}
+
+/* Einzelnes Zeichen von Titel/Text (siehe buildCharSpans) - waehrend .decoding zeigt es einen
+   zufaelligen Borg-Schriftzeichen-Platzhalter (borg.ttf, siehe .borg weiter oben), der blinkt
+   und sich um 90° dreht; sobald aufgeloest (Klasse entfernt) steht das echte Zeichen in
+   normaler Schrift still da. */
+.tooltip-char {
+	display: inline-block;
+}
+
+/* Nutzerwunsch: Zeilenumbruch nach Woertern, nicht nach einzelnen Zeichen (siehe main.js
+   buildCharSpans) - fasst alle .tooltip-char-Spans EINES Worts zu einer einzigen inline-block-Box
+   zusammen, vor/nach der der Browser umbrechen darf, aber nie mittendrin. overflow-wrap:anywhere
+   als Sicherheitsnetz fuer ein einzelnes Wort, das breiter als der Container waere. */
+.tooltip-word {
+	display: inline-block;
+	overflow-wrap: anywhere;
+}
+
+.tooltip-char.decoding {
+	font-family: borg, monospace;
+	animation: tooltipCharDecode 0.35s steps(2, jump-none) infinite;
+}
+
+/* Borg-Platzhalterzeichen auf den Sprach-Kreisen (main.js updateLangScreenFrame) rendert bei
+   GLEICHER font-size sichtbar kleiner als der echte Text daneben - gemessen per getBBox() bei
+   font-size:13px (beide bold): echter Text (Courier New) 14.67px hoch, Borg-Zeichen (borg.ttf)
+   nur 11.33px hoch, Faktor 1.294. Ohne diese Korrektur wirkte das Aufblitzen wie ein Sprung zu
+   einer sichtbar kleineren Schrift statt zu einem gleich grossen, nur anderen Zeichen. */
+.lang-node-label .tooltip-char.decoding {
+	font-size: 16.8px;
+}
+
+@keyframes tooltipCharDecode {
+	0%, 100% {
+		opacity: 1;
+		transform: rotate(0deg);
+	}
+	50% {
+		opacity: 0.25;
+		transform: rotate(90deg);
+	}
+}
+
+/* Kopfzeile des Klick-Panels: Titel + reiner Schliessen-Knopf (Nutzerwunsch - die vorherige
+   "ОТКЛЮЧИТЬ"-Schaltflaeche unten hat nie mehr getan als das Panel zu schliessen, das erledigt
+   jetzt dieses Kreuz, gleiche Optik wie .md-preview-close/.md-preview-header). Nutzerwunsch
+   "объедини линии": wieder einzeilig - main.js' #modPanelTabs (Install/Readme/Changelog) sitzt
+   jetzt NICHT mehr hier, sondern unterhalb von #infoText (siehe .mod-doc-tabs weiter unten). */
+.info-panel-header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 12px;
+	flex-shrink: 0;
+	/* Nutzerwunsch: das Schliessen-Kreuz muss IMMER sichtbar bleiben, auch bei langem gescrolltem
+	   Inhalt - nicht erst nach Zurueckscrollen an den Anfang. .info-panel ist selbst der scrollende
+	   Rahmen (overflow-y:auto), darum reicht ein sticky Header darin. Eigener undurchsichtiger
+	   Hintergrund (gleiche Farbe wie --panel-bg, ohne den Blur-Effekt des Panels selbst), damit
+	   darunter wegscrollender Text nicht sichtbar durchscheint; negative Margin+zusaetzliches
+	   Padding gleichen das padding:25px von .info-panel aus, damit der Hintergrund bis an den
+	   tatsaechlichen oberen Rand reicht statt einen Spalt frei zu lassen. */
+	position: sticky;
+	top: -25px;
+	margin: -25px -25px 0;
+	padding: 22px 25px 18px;
+	background: var(--panel-bg);
+	z-index: 1;
+}
+
+.info-panel-title {
+	font-size: 20px;
+}
+
+.info-panel-close {
+	background: rgba(78, 255, 68, 0.1);
+	border: 1px solid var(--borg-green);
+	color: var(--borg-green);
+	width: 32px;
+	height: 32px;
+	min-width: 32px;
+	border-radius: 50%;
+	cursor: pointer;
+	font-size: 20px;
+	line-height: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+}
+
+.info-panel-close:hover {
+	background: rgba(78, 255, 68, 0.25);
+}
+
+/* Einzige Aktionsschaltflaeche eines Katalog-Knotens (Nutzerwunsch: "activной сделай только либо
+   Установить либо Отключить") - main.js renderPanelActionButton schaltet Text/Klasse je nach
+   Installationsstand um, statt zwei Knoepfe nebeneinander zu zeigen. */
+.panel-action-btn {
+	border: 1px solid var(--borg-green);
+	color: var(--borg-green);
+	padding: 10px;
+	width: 100%;
+	cursor: pointer;
+	margin-top: auto;
+	border-radius: 8px;
+	font-family: 'Courier New', monospace;
+	letter-spacing: 0.05em;
+	background: rgba(78, 255, 68, 0.1);
+}
+
+.panel-action-btn:hover {
+	background: rgba(78, 255, 68, 0.25);
+}
+
+.panel-action-btn:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+.panel-action-uninstall {
+	border-color: #ff8478;
+	color: #ff8478;
+	background: rgba(255, 132, 120, 0.1);
+}
+
+.panel-action-uninstall:hover {
+	background: rgba(255, 132, 120, 0.22);
+}
+
+.panel-action-status {
+	margin-top: 8px;
+	font-size: 13px;
+	min-height: 1em;
+}
+
+.panel-action-status.ok { color: #7df396; }
+.panel-action-status.bad { color: #ff8478; }
+
+.panel-action-substep-btn {
+	background: rgba(78, 255, 68, 0.1);
+	border: 1px solid var(--borg-green);
+	color: var(--borg-green);
+	padding: 6px 10px;
+	margin: 4px 6px 0 0;
+	cursor: pointer;
+	border-radius: 6px;
+	font-family: 'Courier New', monospace;
+}
+
+.panel-action-substep-btn:hover {
+	background: rgba(78, 255, 68, 0.25);
+}
+
+/* Frisch eingezeichnete Branch-Hub-Verbindung (main.js animateBranchConnected/
+   installModVersion) - blendet weich ein statt hart zu erscheinen ("die Branche wird ins
+   Kollektiv aufgenommen"); .branch-dematerializing ist das Gegenstueck beim Отключить der
+   letzten installierten Version dieser Mod-Id (animateBranchDisconnected). */
+.branch-materializing {
+	animation: branchMaterialize 0.9s ease-out;
+}
+
+@keyframes branchMaterialize {
+	from {
+		opacity: 0;
+		stroke-width: 8px;
+		filter: drop-shadow(0 0 14px var(--borg-green));
+	}
+	to {
+		opacity: 0.4;
+		stroke-width: 3px;
+	}
+}
+
+.branch-dematerializing {
+	transition: opacity 0.5s ease-in;
+	opacity: 0 !important;
+}
+
+/* Nutzerwunsch: "соединяй их красной линией связи между собой" - Verbindung zwischen zwei
+   Konflikt-Geschwistern auf derselben Kettenstufe (main.js buildCatalogNodes/conflictPeerIds,
+   Pfad-Zeichnung siehe tickInteraction). Ueberschreibt die geerbte gruene stroke-Praesentations-
+   Attribut von #pathsContainer (main.js index.html) fuer GENAU diese Pfad-Elemente. */
+.conflict-link-path {
+	stroke: #ff4444;
+	opacity: 0.85;
+}
+
+/* Ordnerauswahl fuer den STFC-Client (nur im Hub-Panel, siehe main.js initGameFolderPicker) -
+   gleiche Optik/Farbgebung wie der Rest des Panels (ModsManager-Tool nutzt dieselbe borg-html-sdk
+   Palette, siehe dessen theme.css .path-pill/.setup-panel), aber mit den hier bereits
+   vorhandenen CSS-Variablen umgesetzt statt einer zweiten Farbpalette. */
+.info-panel-extra:empty {
+	display: none;
+}
+
+.folder-picker {
+	margin-top: 15px;
+	padding-top: 15px;
+	border-top: 1px solid rgba(78, 255, 68, 0.3);
+}
+
+/* Nutzerbeobachtung: "закладки располагаются на одной линии, а потом после нее идет еще одна
+   линия" - .folder-picker (obige Regel) wird sowohl fuer den Hub-Ordner-Picker (KEINE Reiter
+   darueber, eigene Trennlinie noetig) als auch fuer den Install-Reiter-Inhalt eines Mod-Knotens
+   (main.js renderInstall) wiederverwendet - dort sitzt bereits .mod-doc-tabs' eigener border-bottom
+   direkt darueber (siehe #modPanelTabs). Zwei Linien kurz hintereinander - die zweite ist bei
+   sichtbaren Reitern ueberfluessig, border-top hier gezielt nur fuer DIESEN Fall entfernen. */
+#modPanelTabs:not([hidden]) + #infoPanelExtra > .folder-picker {
+	border-top: none;
+	margin-top: 0;
+}
+
+.folder-picker-label {
+	font-size: 11px;
+	opacity: 0.7;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	margin-bottom: 6px;
+}
+
+.folder-picker-hint {
+	font-family: 'Courier New', monospace;
+	font-size: 11px;
+	line-height: 1.4;
+	color: #9dffa0;
+	background: rgba(78, 255, 68, 0.06);
+	border: 1px solid rgba(78, 255, 68, 0.3);
+	border-radius: 6px;
+	padding: 8px 10px;
+	margin-bottom: 8px;
+	white-space: pre-line;
+}
+
+.folder-name-input {
+	/* width:100% + padding/border ohne border-box haette das Feld frueher ca. 21px ueber den
+	   rechten Rand aller anderen Elemente (Label, Hinweis, Pfad-Pill, Buttons - alles Bloecke mit
+	   width:auto, die Border/Padding automatisch einrechnen) hinausragen lassen - dadurch wirkten
+	   alle Eingabefelder im Hub-Panel unausgerichtet gegenueber dem Rest (Nutzerwunsch: ausrichten). */
+	box-sizing: border-box;
+	width: 100%;
+	font-family: 'Courier New', monospace;
+	font-size: 12px;
+	background: rgba(78, 255, 68, 0.08);
+	border: 1px solid var(--borg-green);
+	border-radius: 6px;
+	padding: 8px 10px;
+	color: var(--borg-green);
+}
+
+.folder-name-input::placeholder {
+	color: rgba(78, 255, 68, 0.5);
+}
+
+.folder-name-input:focus {
+	outline: none;
+	background: rgba(78, 255, 68, 0.14);
+}
+
+.folder-name-input + .folder-picker-hint,
+.lnk-command-row + .folder-picker-actions {
+	margin-top: 10px;
+}
+
+/* Zwei direkt aufeinanderfolgende Eingabefelder ohne Hinweistext dazwischen (siehe main.js
+   initAssemblyManifestField - Source+Target-Paar fuer InstallFiles) brauchen sonst keinen Abstand
+   zueinander. */
+.folder-name-input + .folder-name-input {
+	margin-top: 8px;
+}
+
+/* <input type="file"> uebernimmt zwar Groesse/Rahmen von .folder-name-input, aber der native
+   "Datei auswaehlen"-Button innerhalb bleibt Browser-Standard (laesst sich nicht sinnvoll komplett
+   umstylen) - zumindest Cursor/Abstand an den Rest der Felder angleichen. */
+input[type="file"].folder-name-input {
+	cursor: pointer;
+	padding: 6px 10px;
+}
+
+/* Nur-Lese-Vorschau des PowerShell-Startbefehls (siehe main.js initLnkLauncherField) - selbe
+   Optik/Groesse wie die anderen Felder (.folder-name-input), nur nicht editierbar und mit einem
+   kompakten Kopieren-Knopf direkt rechts daneben statt eines eigenen vollbreiten Buttons. */
+.lnk-command-row {
+	display: flex;
+	gap: 8px;
+	align-items: stretch;
+}
+
+.lnk-command-row .folder-name-input {
+	flex: 1;
+	min-width: 0;
+	cursor: text;
+}
+
+.lnk-copy-btn {
+	flex: 0 0 auto;
+	background: rgba(78, 255, 68, 0.1);
+	border: 1px solid var(--borg-green);
+	color: var(--borg-green);
+	padding: 8px 12px;
+	font-family: 'Courier New', monospace;
+	font-size: 12px;
+	cursor: pointer;
+	border-radius: 6px 0;
+	white-space: nowrap;
+}
+
+.lnk-copy-btn:hover {
+	background: rgba(78, 255, 68, 0.22);
+}
+
+/* Kritischer Fehlerzustand (siehe main.js setGameClientFound/findGameClientFolder) - prime.exe
+   wurde nicht gefunden, der Hub zeigt in diesem Fall trotz gemerktem Ordner-Handle "NO DATA"
+   (siehe refreshHubDataStatus). Roter Rahmen statt der normalen gruenen Farbe macht das WARUM
+   direkt am betroffenen Feld sichtbar. */
+.path-pill.critical {
+	border-color: #ff4444 !important;
+	box-shadow: 0 0 6px rgba(255, 68, 68, 0.5);
+}
+
+/* Dieselbe kritische Markierung wie .path-pill.critical, aber fuer Label und Hinweistext des
+   Feldes (siehe main.js makeFolderPicker.setCritical) - solange kein Client verbunden ist
+   (Ordner nie gewaehlt/vergessen/Suche fehlgeschlagen/Zugriff verloren), sollen nicht nur der
+   Pfad-Pill, sondern die ganze Einstellung rot auffallen. */
+.folder-picker-label.critical {
+	color: #ff8478 !important;
+}
+.folder-picker-hint.critical {
+	color: #ff8478 !important;
+	border-color: #ff4444 !important;
+	background: rgba(255, 68, 68, 0.06) !important;
+	box-shadow: 0 0 6px rgba(255, 68, 68, 0.35);
+}
+
+/* Gelbe Variante von .critical (siehe main.js initClientPrepareField.setCritical) - kein Fehler,
+   nur eine Warnung: die Kopie existiert und ist benutzbar, aber das Original wurde seit der
+   letzten Vorbereitung aktualisiert (GameAssembly.dll-birthtime neuer). Dieselbe Rahmen-Logik wie
+   .critical, nur in Gelb statt Rot (passt zu .folder-picker-status.warn). */
+.path-pill.warn {
+	border-color: #ffc24d !important;
+	box-shadow: 0 0 6px rgba(255, 194, 77, 0.5);
+}
+.folder-picker-label.warn {
+	color: #ffc24d !important;
+}
+.folder-picker-hint.warn {
+	color: #ffc24d !important;
+	border-color: #ffc24d !important;
+	background: rgba(255, 194, 77, 0.06) !important;
+	box-shadow: 0 0 6px rgba(255, 194, 77, 0.35);
+}
+
+.borg-checkbox-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	font-size: 12px;
+	color: var(--borg-green);
+	cursor: pointer;
+}
+
+.borg-checkbox-row input[type="checkbox"] {
+	width: 16px;
+	height: 16px;
+	accent-color: var(--borg-green);
+	cursor: pointer;
+}
+
+.folder-picker .path-pill {
+	font-family: 'Courier New', monospace;
+	font-size: 12px;
+	background: rgba(78, 255, 68, 0.08);
+	border: 1px solid var(--borg-green);
+	border-radius: 6px;
+	padding: 8px 10px;
+	color: var(--borg-green);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	margin-bottom: 8px;
+}
+
+.folder-picker-status {
+	font-size: 11px;
+	min-height: 14px;
+	margin-bottom: 10px;
+	opacity: 0.85;
+}
+
+.folder-picker-status.ok { color: #7df396; }
+.folder-picker-status.warn { color: #ffc24d; }
+.folder-picker-status.bad { color: #ff8478; }
+
+/* Nutzerwunsch: "показывай текущий путь откуда взята информация об этом моде" - Quellenliste im
+   Install-Reiter (main.js initModDownloadField renderSourcesInfo). Bei nur einer Quelle bleibt die
+   Zeile in der normalen Textfarbe (nichts zum Gegenpruefen); bei mehreren Quellen fuer dieselbe
+   Id+Version signalisiert gruen/rot (mod-source-info-ok/-bad), ob diese konkrete Quelle mit den
+   uebrigen inhaltlich uebereinstimmt (siehe groupCatalogEntriesByMod/modEntriesEquivalent). */
+.mod-source-info-heading {
+	font-size: 11px;
+	opacity: 0.7;
+	margin-bottom: 2px;
+}
+.mod-source-info {
+	font-size: 11px;
+	margin-bottom: 10px;
+	opacity: 0.9;
+}
+/* Nutzerwunsch (PRAEZISIERT): der absolute Pfad/direkte Datei-Link soll VOLLSTAENDIG sichtbar sein
+   ("явно указывать"), nicht per text-overflow:ellipsis abgeschnitten - bricht darum jetzt normal
+   um (kann bei langen Pfaden/URLs mehrzeilig werden) statt in einer erzwungenen einzelnen Zeile zu
+   verschwinden. */
+.mod-source-info-row {
+	white-space: normal;
+	overflow-wrap: break-word;
+	margin-bottom: 6px;
+}
+.mod-source-info-label {
+	font-weight: bold;
+}
+.mod-source-info-row a {
+	color: inherit;
+}
+.mod-source-info-ok { color: #7df396; }
+.mod-source-info-bad { color: #ff8478; }
+
+.folder-picker-actions {
+	display: flex;
+	gap: 8px;
+}
+
+/* Nutzerwunsch: Установить/Отключить (main.js #panelActionBtn, sonst 100%-breit/eigenstaendig,
+   siehe .panel-action-btn) wird bei einem Mod-Knoten JETZT per JS in dieselbe Zeile wie
+   Загрузить/Удалить gehaengt (initModDownloadField) - hier auf dieselbe auto-Breite/Optik wie
+   seine neuen Geschwister zurueckgestutzt, sonst wuerde sein eigenes width:100% die Zeile sprengen. */
+.folder-picker-actions .panel-action-btn {
+	width: auto;
+	flex: 1 1 auto;
+	margin-top: 0;
+	padding: 8px 12px;
+	font-size: 12px;
+	border-radius: 6px 0;
+}
+
+/* Live-Fortschritt von "Найти автоматически" (siehe main.js makeFolderPicker/autoDetectGameFolder) -
+   ohne dieses Styling war die Log-Box zwar im DOM sichtbar (hidden entfernt), aber unformatiert und
+   damit kaum als "Suche laeuft"-Anzeige erkennbar (Nutzerbeobachtung: "не выводит никакой анимации
+   процесса"). Feste Hoehe + eigener Scrollbereich, damit viele Zeilen (ein Eintrag pro geprueftem
+   Ordner) das Panel nicht sprengen - neueste Zeile automatisch ins Bild (siehe appendAutoDetectLog
+   scrollTop). */
+/* Prozent-Fortschritt fuer "Подготовить клиента" (Kopieren, siehe main.js initClientPrepareField)
+   UND fuer den C:\Games-Suchdurchlauf von autoDetectGameFolder - simpler Balken statt Spinner,
+   da fuer beide eine echte Prozentzahl vorliegt (Kopieren: done_bytes/total_bytes vom Rust-Event;
+   Suche: besuchte/gesamt Ordner aus einem schnellen Vorab-Zaehldurchlauf). */
+.folder-picker-progress-wrap {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-top: 8px;
+}
+
+.folder-picker-progress-bar {
+	flex: 1;
+	height: 8px;
+	border-radius: 4px;
+	background: rgba(78, 255, 68, 0.1);
+	border: 1px solid rgba(78, 255, 68, 0.3);
+	overflow: hidden;
+}
+
+.folder-picker-progress-fill {
+	height: 100%;
+	width: 0%;
+	background: var(--borg-green);
+	box-shadow: 0 0 6px rgba(78, 255, 68, 0.7);
+	transition: width 0.15s ease;
+}
+
+.folder-picker-progress-pct {
+	font-family: 'Courier New', monospace;
+	font-size: 11px;
+	color: var(--borg-green);
+	min-width: 34px;
+	text-align: right;
+}
+
+.folder-picker-autodetect-log {
+	font-family: 'Courier New', monospace;
+	font-size: 11px;
+	line-height: 1.5;
+	color: var(--borg-green);
+	opacity: 0.8;
+	background: rgba(78, 255, 68, 0.05);
+	border: 1px solid rgba(78, 255, 68, 0.3);
+	border-radius: 6px;
+	padding: 6px 10px;
+	margin-top: 8px;
+	max-height: 120px;
+	overflow-y: auto;
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+}
+
+/* Nutzerwunsch: "поле лога в окне настроек мода на закладке Установить автоматически увеличивай
+   до размеров окна с адекватным отступом от краев" - #modDlLog ist dieselbe Klasse wie oben (120px
+   Standard-Deckel, dort weiterhin passend fuer die kleineren Autodetect-Logs), hier aber bewusst
+   an die tatsaechliche Fensterhoehe gekoppelt statt auf einen festen Pixelwert gedeckelt - waechst
+   mit dem Fenster mit, laesst aber immer Raum fuer Kopfzeile/Aktionen/Status darueber uebrig. */
+#modDlLog {
+	/* Nutzerwunsch: "еще уменьши процент до которого может расти поле лога по отношению к границе
+	   окна" - nur ein Fallback fuer den allerersten (JS-losen) Anstrich, main.js
+	   adjustModDlLogMaxHeight() ersetzt das gleich darauf durch den tatsaechlich gemessenen Platz. */
+	max-height: 32vh;
+}
+
+.folder-pick-btn, .folder-forget-btn {
+	background: rgba(78, 255, 68, 0.1);
+	border: 1px solid var(--borg-green);
+	color: var(--borg-green);
+	padding: 8px 12px;
+	font-family: 'Courier New', monospace;
+	font-size: 12px;
+	cursor: pointer;
+	border-radius: 6px 0;
+	flex: 1;
+}
+
+.folder-pick-btn:hover, .folder-forget-btn:hover {
+	background: rgba(78, 255, 68, 0.22);
+}
+
+.folder-pick-btn:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+
+/* Quellen-fuer-Mods-Liste (siehe main.js initModSourcesField/renderModSourcesList) - beliebig
+   viele Zeilen, jede wie ein kompaktes Mini-Ordnerauswahl-Feld (Label + Pfad-Pill + Status +
+   Loeschen-Button), gestapelt mit etwas Abstand dazwischen. */
+.mod-sources-list {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	margin-bottom: 10px;
+}
+
+.mod-source-row {
+	border: 1px solid rgba(78, 255, 68, 0.3);
+	border-radius: 6px;
+	padding: 8px 10px;
+	background: rgba(78, 255, 68, 0.04);
+}
+
+.mod-source-row-label {
+	font-size: 11px;
+	opacity: 0.7;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	margin-bottom: 6px;
+}
+
+.mod-source-row .path-pill.mod-source-row-value {
+	display: block;
+	margin-bottom: 6px;
+}
+
+.mod-source-row .folder-picker-status {
+	margin-bottom: 6px;
+}
+
+.mod-source-row .folder-picker-actions {
+	margin-bottom: 0;
+}
+
+.mod-source-empty {
+	font-size: 12px;
+	opacity: 0.6;
+	margin-bottom: 10px;
+}
+
+.status-log {
+	position: absolute;
+	top: 20px;
+	left: 20px;
+	width: 250px;
+	font-size: 10px;
+	color: var(--borg-green);
+	pointer-events: none;
+	line-height: 1.2;
+	text-shadow: 0 0 5px var(--borg-green);
+}
+
+/* Fixierte erste Zeile (Build-Version, siehe main.js BUILD_VERSION/startStatusLog) - bewusst
+   AUSSERHALB von .status-log-entries, damit sie vom Ausblenden/Verschieben der zufaellig
+   generierten Log-Zeilen dort unberuehrt bleibt (Nutzerwunsch: "неменяемую несмещаемую строку"). */
+.status-log-version {
+	opacity: 0.75;
+	margin-bottom: 3px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.status-log-entries {
+	height: 120px;
+	opacity: 0.5;
+	overflow: hidden;
+	-webkit-mask-image: linear-gradient(to bottom, transparent, black 20%, black);
+	mask-image: linear-gradient(to bottom, transparent, black 20%, black);
+}
+
+/* FX */
+.radar-ring {
+	stroke: var(--borg-green);
+	stroke-width: 1;
+	fill: none;
+	pointer-events: none;
+	/* r/opacity werden pro Frame per JS gesetzt (tickRadar) - hier bewusst nicht ueberschreiben */
+}
+
+/* Einmaliger Installations-Burst (siehe main.js firePulsarBurst) - deutlich kraeftiger als der
+   dauerhafte, dezente .radar-ring (Nutzerwunsch: "яркой анимацией"): breiterer Strich + Glow-Filter,
+   r/opacity ebenfalls pro Frame per JS gesetzt. */
+.pulsar-ring {
+	stroke: var(--borg-green);
+	stroke-width: 2.5;
+	fill: none;
+	pointer-events: none;
+	filter: url(#glow);
+}
+
+.ghost-element {
+	opacity: 0.12;
+	pointer-events: none;
+}
+
+.data-pulse {
+	opacity: 0;
+	animation: pulseFade 1s forwards;
+}
+
+@keyframes pulseFade {
+	to {
+		opacity: 1;
+	}
+}
+
+.path-highlight {
+	stroke-width: 5px !important;
+	stroke: #d8ffc9 !important; /* weiss-gruen statt reinweiss */
+	opacity: 1 !important;
+	filter: drop-shadow(0 0 10px var(--borg-green)) !important; /* Extra Glühen */
+	transition: stroke 0.2s ease, stroke-width 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
+}
+
+/* Verbindungslinie Knoten->Sprechblase (siehe main.js updateHoverTooltipPosition): liegt jetzt
+   als eigenstaendiges <path> ganz am Ende von #neuralNet (nach #nodesContainer), damit es ueber
+   allen Knoten/Branches gezeichnet wird (SVG-Malreihenfolge = Dokumentreihenfolge) statt darunter
+   wie zuvor in #pathsContainer (dessen group-opacity="0.4" die Linie zusaetzlich abgedunkelt
+   hatte). Farbe/Gluehen 1:1 wie .node-highlight (dieselbe "ausgewaehlt"-Optik), nicht wie das
+   schwaechere .path-highlight. */
+.hover-tooltip-connector {
+	fill: none !important;
+	stroke: #d8ffc9 !important;
+	stroke-width: 3px !important;
+	filter: brightness(1.7) drop-shadow(0 0 14px var(--borg-green)) !important;
+	opacity: 1 !important;
+}
+
+/* font */
+.borg-script {
+	position: absolute;
+	display: flex;
+	gap: 15px;
+	filter: drop-shadow(0 0 4px var(--borg-green));
+	opacity: 0.7;
+}
+
+.right-row {
+	right: 60px;
+	top: 50px;
+	flex-direction: row;
+}
+
+/* Basis für ein Schriftzeichen-Modul */
+.glyph {
+	position: relative;
+	width: 24px;
+	height: 24px;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	animation: glyphFlicker 4s infinite alternate;
+}
+
+/* Die verschiedenen mathematischen Kreisformen der Borg */
+.char-circle {
+	width: 100%;
+	height: 100%;
+	border: 2px solid var(--borg-green);
+	border-radius: 50%;
+}
+
+.char-circle.broken {
+	border-bottom-color: transparent;
+	animation: spinGlyph 8s linear infinite;
+}
+
+.char-arc {
+	width: 100%;
+	height: 100%;
+	border: 2px solid transparent;
+	border-radius: 50%;
+}
+.char-arc.top { border-top-color: var(--borg-green); }
+.char-arc.bottom { border-bottom-color: var(--borg-green); }
+.char-arc.left { border-left-color: var(--borg-green); }
+.char-arc.right { border-right-color: var(--borg-green); }
+
+.char-dot {
+	position: absolute;
+	width: 5px;
+	height: 5px;
+	background-color: var(--borg-green);
+	border-radius: 50%;
+	right: -8px;
+	top: 50%;
+	transform: translateY(-50%);
+}
+
+.char-dot.inner {
+	right: auto;
+	top: auto;
+	transform: none;
+	width: 4px;
+	height: 4px;
+}
+
+/* Text-Animationen für das Interface-Feeling */
+@keyframes glyphFlicker {
+	0%, 90%, 100% { opacity: 0.8; }
+	93%, 97% { opacity: 0.3; }
+}
+
+@keyframes spinGlyph {
+	from { transform: rotate(0deg); }
+	to { transform: rotate(360deg); }
+}
+
+.pulse {
+	animation: pulseGlyph 2s infinite ease-in-out;
+}
+
+/* Ein Glyph im rechten oberen Bereich dient als Umschalter zwischen der radialen 360°-Anordnung
+   und dem Versuch, alles auf den aktuellen Bildschirm zu passen (siehe layoutToggleBtn in main.js) */
+.layout-toggle {
+	cursor: pointer;
+	pointer-events: auto;
+	transition: filter 0.2s;
+}
+
+.layout-toggle:hover {
+	filter: brightness(1.6) drop-shadow(0 0 6px var(--borg-green));
+}
+
+.layout-toggle.active .char-circle {
+	background: var(--borg-green);
+	box-shadow: 0 0 10px var(--borg-green);
+}
+
+@keyframes pulseGlyph {
+	0%, 100% { transform: scale(1); }
+	50% { transform: scale(0.8); opacity: 0.5; }
+}
+
+.terminal-status {
+	position: absolute;
+	bottom: 30px;
+	color: var(--borg-green);
+	font-size: 12px;
+	letter-spacing: 2px;
+	opacity: 0.6;
+	text-shadow: 0 0 5px var(--borg-green);
+}
+
+.interactive-text {
+	cursor: pointer;
+	color: var(--borg-green);
+	font-weight: bold;
+	padding: 0 5px;
+	transition: all 0.2s ease;
+}
+
+.interactive-text:hover {
+	background-color: var(--borg-green);
+	color: #000;
+	text-shadow: none;
+}
+
+
+.burst-pulse {
+	fill: #ffffff !important;               /* Strahlendes Weiß im Kern */
+	stroke: var(--borg-green) !important;   /* Grüner border */
+	stroke-width: 1px;
+	opacity: 1 !important;
+	filter: drop-shadow(0 0 4px var(--borg-green)) !important; /* Intensiver Borg-Glow */
+	z-index: 10;
+}
+
+
+.burst-pulse-fx {
+	fill: #ffffff !important;
+	stroke: var(--borg-green) !important;
+	stroke-width: 1.5px;
+	filter: drop-shadow(0 0 5px var(--borg-green)) !important;
+	pointer-events: none;
+}
+
+/* Markdown-Vorschau (siehe main.js renderMarkdownToHtml/openMarkdownPreview) - eigenes Overlay im
+   selben dunklen/gruenen Look wie .info-panel, aber als zentriertes Modal statt seitlich
+   einfahrend, da es UEBER einem bereits offenen Panel erscheint (Nutzerwunsch: Vorschaufenster,
+   kein Ersatz fuer das Formular darunter). */
+.md-preview-overlay {
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.75);
+	z-index: 200;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	opacity: 0;
+	visibility: hidden;
+	transition: opacity 0.25s ease;
+}
+
+.md-preview-overlay.active {
+	opacity: 1;
+	visibility: visible;
+}
+
+.md-preview-panel {
+	/* Exakt dieselbe Groesse wie .info-panel (Nutzerwunsch: "подгони под размер окна открывающегося
+	   при клике на любой из кружков на ветках") - 80% Breite/Hoehe, kein max-width/max-height-Deckel. */
+	width: 80%;
+	height: 80%;
+	background: var(--panel-bg);
+	backdrop-filter: blur(10px);
+	border: 1.5px solid var(--borg-green);
+	border-radius: 30px;
+	padding: 25px;
+	color: var(--borg-green);
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+.md-preview-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	border-bottom: 1px solid rgba(78, 255, 68, 0.3);
+	padding-bottom: 10px;
+	margin-bottom: 14px;
+	flex-shrink: 0;
+}
+
+.md-preview-title {
+	font-size: 18px;
+	font-weight: bold;
+	font-family: 'Courier New', monospace;
+	text-shadow: 0 0 6px var(--borg-green);
+}
+
+.md-preview-close {
+	background: rgba(78, 255, 68, 0.1);
+	border: 1px solid var(--borg-green);
+	color: var(--borg-green);
+	width: 32px;
+	height: 32px;
+	min-width: 32px;
+	border-radius: 50%;
+	cursor: pointer;
+	font-size: 20px;
+	line-height: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.md-preview-close:hover {
+	background: rgba(78, 255, 68, 0.25);
+}
+
+.md-preview-content {
+	overflow-y: auto;
+	flex: 1;
+	font-family: 'Courier New', monospace;
+	font-size: 14px;
+	line-height: 1.6;
+	scrollbar-width: thin;
+	scrollbar-color: rgba(78, 255, 68, 0.45) transparent;
+}
+
+.md-preview-content::-webkit-scrollbar { width: 10px; }
+.md-preview-content::-webkit-scrollbar-track { background: transparent; }
+.md-preview-content::-webkit-scrollbar-thumb {
+	background-color: rgba(78, 255, 68, 0.45);
+	border-radius: 10px;
+	border: 2px solid transparent;
+	background-clip: padding-box;
+}
+.md-preview-content::-webkit-scrollbar-thumb:hover { background-color: rgba(78, 255, 68, 0.7); }
+
+/* Typografie fuer den gerenderten Markdown-Inhalt selbst (.md-content) - an GitHubs README-Optik
+   angelehnt (klare Ueberschriften-Hierarchie, abgesetzte Codebloecke, Zitat-Leiste), aber komplett
+   in der bestehenden Borg-Palette/Monospace-Schrift statt GitHubs eigener Typografie. Bewusst als
+   eigene Klasse (nicht an .md-preview-content gebunden) - dieselbe Klasse soll spaeter auch in
+   einem echten Mod-Knoten-Panel (info-panel-extra) wiederverwendet werden koennen. */
+.md-content h1, .md-content h2, .md-content h3, .md-content h4, .md-content h5, .md-content h6 {
+	font-family: 'Courier New', monospace;
+	color: var(--borg-green);
+	text-shadow: 0 0 6px var(--borg-green);
+	margin: 1.1em 0 0.5em;
+	line-height: 1.3;
+}
+.md-content h1:first-child, .md-content h2:first-child, .md-content h3:first-child { margin-top: 0; }
+.md-content h1 { font-size: 25px; border-bottom: 1px solid rgba(78, 255, 68, 0.3); padding-bottom: 8px; }
+.md-content h2 { font-size: 20px; border-bottom: 1px solid rgba(78, 255, 68, 0.2); padding-bottom: 6px; }
+.md-content h3 { font-size: 17px; }
+.md-content h4, .md-content h5, .md-content h6 { font-size: 15px; }
+.md-content p { margin: 0.8em 0; }
+.md-content a { color: #80ff7a; text-decoration: underline; }
+.md-content a:hover { text-shadow: 0 0 6px var(--borg-green); }
+.md-content strong { color: #80ff7a; }
+.md-content code {
+	background: rgba(78, 255, 68, 0.08);
+	border: 1px solid rgba(78, 255, 68, 0.25);
+	border-radius: 4px;
+	padding: 1px 5px;
+	font-size: 0.92em;
+}
+.md-content pre {
+	background: rgba(0, 0, 0, 0.4);
+	border: 1px solid rgba(78, 255, 68, 0.25);
+	border-radius: 8px;
+	padding: 12px 14px;
+	overflow-x: auto;
+	margin: 0.8em 0;
+}
+.md-content pre code { background: none; border: none; padding: 0; }
+.md-content ul, .md-content ol { margin: 0.6em 0; padding-left: 1.6em; }
+.md-content li { margin: 0.25em 0; }
+.md-content blockquote {
+	border-left: 3px solid var(--borg-green);
+	background: rgba(78, 255, 68, 0.06);
+	margin: 0.8em 0;
+	padding: 6px 14px;
+	color: rgba(78, 255, 68, 0.85);
+}
+.md-content hr { border: none; border-top: 1px solid rgba(78, 255, 68, 0.3); margin: 1.5em 0; }
+.md-content img { max-width: 100%; border-radius: 6px; border: 1px solid rgba(78, 255, 68, 0.25); }
+.md-content table { border-collapse: collapse; width: 100%; margin: 0.8em 0; font-size: 0.95em; }
+.md-content th, .md-content td { border: 1px solid rgba(78, 255, 68, 0.3); padding: 6px 10px; text-align: left; }
+.md-content th { background: rgba(78, 255, 68, 0.1); }
+
+/* Install/Readme/Changelog-Reiter des Mod-Panels (main.js initModDownloadField/#modPanelTabs) -
+   Nutzerwunsch: "сделай форму закладки а не кнопки" - echte Seiten-Reiter (wie Browser-/Menue-Tabs),
+   flach an der Oberkante, mit ihrem eigenen unteren Rand als sichtbare Trennlinie zum Inhalt
+   darunter. Der aktive Reiter verschmilzt optisch mit dem Panel-Hintergrund (--panel-bg, identisch
+   mit .info-panel-extra/.info-panel-header), inaktive Reiter bleiben sichtbar abgesetzt (eigener
+   unterer Rand, gedaempfte Farbe). Nutzerwunsch "опусти закладки под краткое описание и автора":
+   sitzt jetzt UNTERHALB von #infoText, NICHT mehr in der (einzeiligen) Kopfzeile. Nutzerwunsch
+   "немного отодвинь от правого края" - margin-right haelt Abstand zur Spalte des Schliessen-Kreuzes
+   oben in der Kopfzeile. */
+.mod-doc-tabs {
+	display: flex;
+	justify-content: flex-end; /* Nutzerwunsch: "сдвинь все закладки вправо" */
+	gap: 2px;
+	margin: 4px 10px 0 0;
+	border-bottom: 1px solid rgba(78, 255, 68, 0.3);
+}
+/* Nutzerbeobachtung: "в настройках центрального плексуса опять появились закладки" - main.js
+   hideModPanelTabs() setzt nur das hidden-Attribut, aber die obige Regel gibt .mod-doc-tabs ein
+   eigenes display:flex OHNE :not([hidden]) - eine Autoren-Regel mit gesetzter display-Eigenschaft
+   ueberschreibt IMMER die UA-Standardregel "[hidden] { display: none }", das hidden-Attribut allein
+   blendet das Element darum nicht mehr aus. Fiel bisher nur nicht auf, wenn zuvor noch NIE ein
+   Mod-Panel mit befuellten Reitern offen war (leere Buttons sind unsichtbar) - sobald aber vorher
+   irgendein Katalog-Knoten geoeffnet wurde (Reiter-Text bereits gesetzt), blieben sie beim
+   Hub/Bug-Reports/Sammel-Knoten sichtbar haengen. Explizite Regel mit hoeherer Spezifitaet stellt
+   das echte Ausblenden wieder her.
+*/
+#modPanelTabs[hidden] {
+	display: none;
+}
+.mod-doc-tab {
+	background: transparent;
+	border: 1px solid transparent;
+	border-bottom: none;
+	color: var(--borg-green);
+	opacity: 0.6;
+	border-radius: 6px 6px 0 0;
+	padding: 6px 16px;
+	margin-bottom: -1px;
+	font-size: 12px;
+	cursor: pointer;
+}
+.mod-doc-tab.active {
+	background: rgba(78, 255, 68, 0.08);
+	border-color: rgba(78, 255, 68, 0.3);
+	border-bottom: 1px solid var(--panel-bg);
+	opacity: 1;
+	font-weight: bold;
+}
+.mod-doc-tab:hover:not(.active) { opacity: 0.9; }
+.mod-doc-tab:disabled { opacity: 0.3; cursor: default; }
+

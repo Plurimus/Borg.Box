@@ -1,0 +1,36 @@
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 20010904//EN"
+ "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">
+<svg version="1.0" xmlns="http://www.w3.org/2000/svg"
+ width="1000" height="1000" viewBox="0 0 1000 1000"
+ preserveAspectRatio="xMidYMid meet">
+
+<!--
+	ШАБЛОН для neue Branchen-Icons (Borg.Box) - siehe Chat-Regeln:
+
+	1. Quadratisches viewBox (bereits 1000x1000) - ein Kreis-Knoten nutzt eine kompakte/quadratische
+	   Komposition effizienter aus als ein laenglich-schmales Bild.
+	2. Zeichnen SIE dicht an die Fuehrungslinie (Kreis) unten heran - so wenig Leerraum um die
+	   Figur wie moeglich. Je enger, desto seltener muss der Fit-Faktor in main.js nachjustiert werden.
+	3. NUR schwarze Fuellung (#000000), keine Kontur (stroke), transparenter Hintergrund - die
+	   Maske im Projekt nutzt den Alphakanal direkt (kein Invertieren noetig).
+	4. Die Figur sollte zentriert sein (Mittelpunkt der Figur = Mittelpunkt dieses Quadrats, 500,500).
+	5. Vor dem Speichern der fertigen Datei: die Gruppe id="guide" unten LOESCHEN (sie ist nur eine
+	   Zeichenhilfe, darf nicht in der finalen Datei landen).
+-->
+
+<!-- === guide: Fuehrungslinie = tatsaechliche Kreisgrenze des Knotens auf der Seite. Zeichnen Sie
+     INNERHALB dieser Linie (kleiner Abstand von ~5-10% ist ok). VOR DEM SPEICHERN LOESCHEN. === -->
+<g id="guide" fill="none" stroke="#ff00ff" stroke-width="4" stroke-dasharray="12 10">
+	<circle cx="500" cy="500" r="480"/>
+	<line x1="500" y1="10" x2="500" y2="990"/>
+	<line x1="10" y1="500" x2="990" y2="500"/>
+</g>
+
+<!-- === artwork: hier Ihre eigene Zeichnung einfuegen/aufbauen (z.B. per Paste aus einem anderen
+     Editor als <path>/<g> innerhalb dieser Gruppe) === -->
+<g id="artwork" fill="#000000" stroke="none">
+	<!-- <path d="..."/> -->
+</g>
+
+</svg>
