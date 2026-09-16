@@ -13,7 +13,7 @@
 - Visualizes the mod catalog as a branching neural tree around a central hub: each branch is a mod, each node on the branch is a version, the outermost (largest) node is the current/latest version.
 - Installs, updates, and removes signed `.mod` packages directly into a copy of your game client folder — no manual file copying.
 - Verifies package signatures and file hashes before installing anything.
-- Lets you add extra mod sources (a `catalog.json` URL or a local folder) alongside the default one.
+- Lets you add extra mod sources (a `catalog.json` URL or a local folder) alongside the default one — [stfc-mod-source](https://github.com/Plurimus/stfc-mod-source), a curated catalog of signed BepInEx mods for STFC.
 - Includes an in-app **assembly module** to build and sign your own `.mod` packages (manifest editor, DLL metadata reading, changelog/screenshots, key generation).
 - Full UI in 10 languages: English, Russian, German, Italian, French, Spanish, Portuguese, Korean, Chinese, Japanese.
 - The desktop build (this repo) writes files with native Rust I/O, so it isn't limited by the browser's File System Access API restrictions on installing `.dll`/`.exe` files that the PWA version runs into.
@@ -52,7 +52,7 @@ For STFC BepInEx items and Borg.Box support, please visit the [BORG Box](https:/
 - Показывает каталог модов в виде дерева ветвей вокруг центрального хаба: каждая ветка — мод, каждый узел на ветке — версия, самый крайний (большой) узел — текущая/последняя версия.
 - Устанавливает, обновляет и удаляет подписанные `.mod`-пакеты прямо в копию папки клиента игры — без ручного копирования файлов.
 - Проверяет подписи пакетов и хэши файлов перед установкой.
-- Позволяет добавлять дополнительные источники модов (ссылку на `catalog.json` или локальную папку) в дополнение к основному.
+- Позволяет добавлять дополнительные источники модов (ссылку на `catalog.json` или локальную папку) в дополнение к основному — [stfc-mod-source](https://github.com/Plurimus/stfc-mod-source), подобранному каталогу подписанных BepInEx-модов для STFC.
 - Включает встроенный **модуль сборки** для создания и подписи собственных `.mod`-пакетов (редактор манифеста, чтение метаданных из DLL, changelog/скриншоты, генерация ключей).
 - Полный интерфейс на 10 языках: русский, английский, немецкий, итальянский, французский, испанский, португальский, корейский, китайский, японский.
 - Десктопная сборка (этот репозиторий) записывает файлы через нативный Rust-код, поэтому не упирается в ограничение File System Access API браузера на установку `.dll`/`.exe` файлов, с которым сталкивается PWA-версия.
