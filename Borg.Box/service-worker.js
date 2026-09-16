@@ -1,4 +1,4 @@
-const CACHE_NAME = "borg-box-v218";
+const CACHE_NAME = "borg-box-v223";
 const PRECACHE_URLS = [
 	"./",
 	"./index.html",

@@ -56,7 +56,7 @@ const LANG_SELECTED_KEY = "borg-box-language";
 // bei let/const nicht davor, anders als bei einer echt undeklarierten Variable). WICHTIG: dies
 // waehlt nur den Namen auf dem Ecken-Knoten selbst - eine echte Umschaltung aller Interface-Texte
 // auf I18N_PACKS ist ein separates, noch nicht angefordertes Feature, siehe Kommentar dort.
-let cornerNodeLanguageCode = "ru";
+let cornerNodeLanguageCode = "en";
 const CORNER_NODE_R = 60; // groesser als SIZE_LARGE (46, siehe config.js)
 const CORNER_NODE_HOVER_R = 76;
 const CORNER_NODE_SCREEN_MARGIN = 90; // Abstand vom echten Bildschirmrand in CSS-Pixeln
@@ -1266,6 +1266,12 @@ function updateLayoutTransition(now) {
 }
 
 async function initInterface() {
+	// Nutzerwunsch: "английский - языком интерфейса по-умолчанию, а на старте убери флаг выбранного
+	// языка, чтобы при первом запуске появилось окно выбора языка" - kein LANG_SELECTED_KEY in
+	// localStorage (echter Erststart, oder Nutzerdaten geloescht) loest den Sprachauswahl-Bildschirm
+	// automatisch aus (siehe applyLanguage(cornerNodeLanguageCode) am Funktionsende), statt still auf
+	// Englisch zu bleiben.
+	let noLanguageChosenYet = false;
 	const anchor = computeEdgeAnchoredCenter();
 	config.center.x = anchor.x;
 	config.center.y = anchor.y;
@@ -1561,6 +1567,7 @@ async function initInterface() {
 	{
 		const saved = localStorage.getItem(LANG_SELECTED_KEY);
 		if (saved && I18N_PACKS[saved]) cornerNodeLanguageCode = saved;
+		else noLanguageChosenYet = true;
 	}
 	catch (_) {}
 	cornerNodeLabel.textContent = I18N_PACKS[cornerNodeLanguageCode].cornerNodeLabel;
@@ -1732,6 +1739,11 @@ async function initInterface() {
 	// anwenden, nicht nur auf das Ecken-Knoten-Label - jetzt, wo alle Elemente existieren (siehe
 	// applyLanguage weiter unten in der Datei, nach I18N_PACKS).
 	applyLanguage(cornerNodeLanguageCode);
+
+	// Erststart (kein LANG_SELECTED_KEY vorgefunden, siehe oben) - Sprachauswahl-Bildschirm automatisch
+	// oeffnen, noch bevor das (blickdichte) Boot-Overlay ausblendet: der Bildschirm baut sich dahinter
+	// unsichtbar auf und ist fertig, sobald das Overlay wegblendet - kein zusaetzlicher Sprung/Blitz.
+	if (noLanguageChosenYet) playLangScreenTransition();
 }
 
 // Haelt die teure Physik/Layout-Arbeit in tickInteraction anhalten, solange die (blickdichte)
@@ -3083,6 +3095,12 @@ const SKIP_GLYPH_ANIM_KEY = "borg-box-skip-glyph-anim";
 const SKIP_BOOT_ANIM_KEY = "borg-box-skip-boot-anim";
 const LNK_USERNAME_KEY = "borg-box-lnk-username";
 const LNK_MODS_PATH_KEY = "borg-box-lnk-mods-path";
+// Nutzerwunsch: optionale Community-Mod-Konfigurationsdatei (-ccm, relativer Pfad ab modsPath, z.B.
+// "stfc-mod\SERVER2\User2.toml") - nur wenn gesetzt, erscheint zusaetzlich das Titel-Feld (siehe
+// initLnkLauncherField) und buildLnkLaunchCommand baut den Start ueber cmd.exe/title statt prime.exe
+// direkt zu starten (siehe dort).
+const LNK_CCM_PATH_KEY = "borg-box-lnk-ccm-path";
+const LNK_TITLE_KEY = "borg-box-lnk-title";
 
 // Einstellung "Text sofort anzeigen" - ueberspringt die Borg-Entschluesselungs-Animation
 // (playGlyphReveal/revealElementText) komplett: kein Aufbau der Zeichen-Spans, keine gestaffelten
@@ -3501,6 +3519,10 @@ const I18N_PACKS = {
 			usernamePlaceholder: "ИМЯ_ПОЛЬЗОВАТЕЛЯ_WINDOWS",
 			pathHint: "Путь к папке с модами (в desktop-версии определяется и подставляется автоматически; в браузерной версии впишите вручную и проверьте):",
 			pathPlaceholder: "C:\\....ПУТЬ_ДО_ПАПКИ_С_МОДАМИ",
+			ccmPathHint: "Файл настроек Community Mod (необязательно) - относительный путь от папки с модами до .toml-файла, который нужно передать через параметр -ccm (например, для запуска клиента с настройками для конкретного сервера/аккаунта):",
+			ccmPathPlaceholder: "stfc-mod\\SERVER2\\User2.toml",
+			titleHint: "Пометка окна запуска (title) - текст, который появится в заголовке окна консоли, запускающей клиент - удобно, чтобы отличать несколько одновременно открытых окон разных аккаунтов/серверов:",
+			titlePlaceholder: "User2 - SERVER2",
 			commandHint: "Готовая команда ниже - скопируйте её в цель собственного ярлыка (powershell.exe как программа, остальное как аргумент) или скачайте готовый .bat-файл.",
 			copyBtn: "Копировать", downloadBtn: "Скачать .bat",
 			copiedStatus: "Скопировано.", copyFailedPrefix: "Не удалось скопировать: "
@@ -3888,6 +3910,10 @@ const I18N_PACKS = {
 			usernamePlaceholder: "WINDOWS_USERNAME",
 			pathHint: "Path to the mods folder (detected and filled in automatically in the desktop build; in the browser version, enter and check it manually):",
 			pathPlaceholder: "C:\\....PATH_TO_MODS_FOLDER",
+			ccmPathHint: "Community Mod settings file (optional) - path, relative to the mods folder, to the .toml file to pass via the -ccm parameter (e.g. to launch the client with settings for a specific server/account):",
+			ccmPathPlaceholder: "stfc-mod\\SERVER2\\User2.toml",
+			titleHint: "Launch window title - text shown in the title bar of the console window that launches the client - useful for telling apart several windows open at once for different accounts/servers:",
+			titlePlaceholder: "User2 - SERVER2",
 			commandHint: "The ready-made command is below - copy it into the target of your own shortcut (powershell.exe as the program, the rest as the argument), or download a ready-made .bat file.",
 			copyBtn: "Copy", downloadBtn: "Download .bat",
 			copiedStatus: "Copied.", copyFailedPrefix: "Could not copy: "
@@ -4151,6 +4177,10 @@ const I18N_PACKS = {
 			usernamePlaceholder: "WINDOWS_BENUTZERNAME",
 			pathHint: "Pfad zum Mods-Ordner (in der Desktop-Version automatisch erkannt und eingetragen; in der Browser-Version bitte manuell eintragen und prüfen):",
 			pathPlaceholder: "C:\\....PFAD_ZUM_MODS_ORDNER",
+			ccmPathHint: "Community-Mod-Konfigurationsdatei (optional) - Pfad relativ zum Mods-Ordner zur .toml-Datei, die ueber den Parameter -ccm uebergeben werden soll (z.B. um den Client mit Einstellungen fuer einen bestimmten Server/Account zu starten):",
+			ccmPathPlaceholder: "stfc-mod\\SERVER2\\User2.toml",
+			titleHint: "Fenstertitel beim Start - Text, der in der Titelleiste des Konsolenfensters erscheint, das den Client startet - nuetzlich, um mehrere gleichzeitig geoeffnete Fenster verschiedener Konten/Server zu unterscheiden:",
+			titlePlaceholder: "User2 - SERVER2",
 			commandHint: "Der fertige Befehl steht unten - kopieren Sie ihn in das Ziel einer eigenen Verknüpfung (powershell.exe als Programm, der Rest als Argument), oder laden Sie eine fertige .bat-Datei herunter.",
 			copyBtn: "Kopieren", downloadBtn: ".bat herunterladen",
 			copiedStatus: "Kopiert.", copyFailedPrefix: "Kopieren fehlgeschlagen: "
@@ -4487,6 +4517,10 @@ const I18N_PACKS = {
 			usernamePlaceholder: "NOME_UTENTE_WINDOWS",
 			pathHint: "Percorso della cartella delle mod (rilevato e inserito automaticamente nella versione desktop; nella versione browser inseriscilo e verificalo manualmente):",
 			pathPlaceholder: "C:\\....PERCORSO_CARTELLA_MOD",
+			ccmPathHint: "File di configurazione Community Mod (facoltativo) - percorso, relativo alla cartella delle mod, del file .toml da passare tramite il parametro -ccm (ad es. per avviare il client con le impostazioni di un server/account specifico):",
+			ccmPathPlaceholder: "stfc-mod\\SERVER2\\User2.toml",
+			titleHint: "Titolo della finestra di avvio - testo mostrato nella barra del titolo della finestra della console che avvia il client - utile per distinguere piu finestre aperte contemporaneamente per account/server diversi:",
+			titlePlaceholder: "User2 - SERVER2",
 			commandHint: "Il comando pronto è qui sotto - copialo nella destinazione di un tuo collegamento (powershell.exe come programma, il resto come argomento), oppure scarica un file .bat già pronto.",
 			copyBtn: "Copia", downloadBtn: "Scarica .bat",
 			copiedStatus: "Copiato.", copyFailedPrefix: "Impossibile copiare: "
@@ -4823,6 +4857,10 @@ const I18N_PACKS = {
 			usernamePlaceholder: "NOM_UTILISATEUR_WINDOWS",
 			pathHint: "Chemin du dossier des mods (détecté et renseigné automatiquement dans la version de bureau ; dans la version navigateur, saisissez-le et vérifiez-le manuellement) :",
 			pathPlaceholder: "C:\\....CHEMIN_DU_DOSSIER_DE_MODS",
+			ccmPathHint: "Fichier de configuration Community Mod (facultatif) - chemin, relatif au dossier des mods, du fichier .toml a transmettre via le parametre -ccm (par ex. pour lancer le client avec les reglages d'un serveur/compte specifique) :",
+			ccmPathPlaceholder: "stfc-mod\\SERVER2\\User2.toml",
+			titleHint: "Titre de la fenetre de lancement - texte affiche dans la barre de titre de la fenetre de console qui lance le client - utile pour distinguer plusieurs fenetres ouvertes en meme temps pour differents comptes/serveurs :",
+			titlePlaceholder: "User2 - SERVER2",
 			commandHint: "La commande prête est ci-dessous - copiez-la dans la cible de votre propre raccourci (powershell.exe comme programme, le reste comme argument), ou téléchargez un fichier .bat prêt à l'emploi.",
 			copyBtn: "Copier", downloadBtn: "Télécharger le .bat",
 			copiedStatus: "Copié.", copyFailedPrefix: "Impossible de copier : "
@@ -5159,6 +5197,10 @@ const I18N_PACKS = {
 			usernamePlaceholder: "NOMBRE_DE_USUARIO_WINDOWS",
 			pathHint: "Ruta a la carpeta de mods (detectada y rellenada automáticamente en la versión de escritorio; en la versión de navegador, introdúzcala y verifíquela manualmente):",
 			pathPlaceholder: "C:\\....RUTA_A_LA_CARPETA_DE_MODS",
+			ccmPathHint: "Archivo de configuración de Community Mod (opcional) - ruta, relativa a la carpeta de mods, del archivo .toml que se pasará mediante el parámetro -ccm (por ejemplo, para iniciar el cliente con la configuración de un servidor/cuenta específicos):",
+			ccmPathPlaceholder: "stfc-mod\\SERVER2\\User2.toml",
+			titleHint: "Título de la ventana de inicio - texto que aparece en la barra de título de la ventana de consola que inicia el cliente - útil para distinguir varias ventanas abiertas a la vez para distintas cuentas/servidores:",
+			titlePlaceholder: "User2 - SERVER2",
 			commandHint: "El comando listo está abajo - cópielo en el destino de su propio acceso directo (powershell.exe como programa, el resto como argumento), o descargue un archivo .bat ya preparado.",
 			copyBtn: "Copiar", downloadBtn: "Descargar .bat",
 			copiedStatus: "Copiado.", copyFailedPrefix: "No se pudo copiar: "
@@ -5495,6 +5537,10 @@ const I18N_PACKS = {
 			usernamePlaceholder: "NOME_DE_USUARIO_WINDOWS",
 			pathHint: "Caminho para a pasta de mods (detectado e preenchido automaticamente na versão desktop; na versão do navegador, insira e verifique manualmente):",
 			pathPlaceholder: "C:\\....CAMINHO_DA_PASTA_DE_MODS",
+			ccmPathHint: "Arquivo de configuração do Community Mod (opcional) - caminho, relativo à pasta de mods, do arquivo .toml a ser passado pelo parâmetro -ccm (por exemplo, para iniciar o cliente com as configurações de um servidor/conta específicos):",
+			ccmPathPlaceholder: "stfc-mod\\SERVER2\\User2.toml",
+			titleHint: "Título da janela de inicialização - texto exibido na barra de título da janela de console que inicia o cliente - útil para distinguir várias janelas abertas ao mesmo tempo para contas/servidores diferentes:",
+			titlePlaceholder: "User2 - SERVER2",
 			commandHint: "O comando pronto está abaixo - copie-o para o destino do seu próprio atalho (powershell.exe como programa, o resto como argumento), ou baixe um arquivo .bat pronto.",
 			copyBtn: "Copiar", downloadBtn: "Baixar .bat",
 			copiedStatus: "Copiado.", copyFailedPrefix: "Não foi possível copiar: "
@@ -5831,6 +5877,10 @@ const I18N_PACKS = {
 			usernamePlaceholder: "WINDOWS_사용자_이름",
 			pathHint: "모드 폴더 경로 (데스크톱 버전에서는 자동으로 감지되어 입력됩니다; 브라우저 버전에서는 직접 입력하고 확인하세요):",
 			pathPlaceholder: "C:\\....모드_폴더_경로",
+			ccmPathHint: "Community Mod 설정 파일 (선택 사항) - -ccm 매개변수로 전달할 .toml 파일의, 모드 폴더 기준 상대 경로입니다 (예: 특정 서버/계정용 설정으로 클라이언트를 실행할 때):",
+			ccmPathPlaceholder: "stfc-mod\\SERVER2\\User2.toml",
+			titleHint: "실행 창 제목 - 클라이언트를 실행하는 콘솔 창의 제목 표시줄에 나타나는 텍스트입니다 - 여러 계정/서버의 창을 동시에 열어둘 때 구분하는 데 유용합니다:",
+			titlePlaceholder: "User2 - SERVER2",
 			commandHint: "아래에 준비된 명령이 있습니다 - 직접 만든 바로가기의 대상에 복사하거나(프로그램은 powershell.exe, 나머지는 인수), 준비된 .bat 파일을 다운로드하세요.",
 			copyBtn: "복사", downloadBtn: ".bat 다운로드",
 			copiedStatus: "복사됨.", copyFailedPrefix: "복사할 수 없습니다: "
@@ -6167,6 +6217,10 @@ const I18N_PACKS = {
 			usernamePlaceholder: "WINDOWS_用户名",
 			pathHint: "模组文件夹的路径（桌面版会自动检测并填入；浏览器版请手动输入并检查）：",
 			pathPlaceholder: "C:\\....模组文件夹路径",
+			ccmPathHint: "Community Mod 设置文件（可选）- 相对于模组文件夹的 .toml 文件路径，将通过 -ccm 参数传入（例如以特定服务器/账号的配置启动客户端）：",
+			ccmPathPlaceholder: "stfc-mod\\SERVER2\\User2.toml",
+			titleHint: "启动窗口标题 - 显示在启动客户端的控制台窗口标题栏中的文本 - 便于区分同时打开的多个不同账号/服务器的窗口：",
+			titlePlaceholder: "User2 - SERVER2",
 			commandHint: "下面是生成好的命令 - 将其复制到您自己创建的快捷方式的目标中（程序为 powershell.exe，其余部分作为参数），或者下载现成的 .bat 文件。",
 			copyBtn: "复制", downloadBtn: "下载 .bat",
 			copiedStatus: "已复制。", copyFailedPrefix: "无法复制："
@@ -6503,6 +6557,10 @@ const I18N_PACKS = {
 			usernamePlaceholder: "WINDOWSユーザー名",
 			pathHint: "Modフォルダへのパス(デスクトップ版では自動検出・自動入力されます。ブラウザ版では手動で入力し確認してください):",
 			pathPlaceholder: "C:\\....MODフォルダへのパス",
+			ccmPathHint: "Community Mod設定ファイル(任意) - -ccmパラメータで渡す.tomlファイルへの、Modフォルダからの相対パスです(特定のサーバー/アカウント用の設定でクライアントを起動する場合などに使用):",
+			ccmPathPlaceholder: "stfc-mod\\SERVER2\\User2.toml",
+			titleHint: "起動ウィンドウのタイトル - クライアントを起動するコンソールウィンドウのタイトルバーに表示されるテキストです。複数のアカウント/サーバーのウィンドウを同時に開いた際の見分けに便利です:",
+			titlePlaceholder: "User2 - SERVER2",
 			commandHint: "準備済みのコマンドは下にあります - 自分で作成したショートカットのリンク先にコピーするか(プログラムはpowershell.exe、残りは引数)、準備済みの.batファイルをダウンロードしてください。",
 			copyBtn: "コピー", downloadBtn: ".batをダウンロード",
 			copiedStatus: "コピーしました。", copyFailedPrefix: "コピーできませんでした: "
@@ -7730,6 +7788,20 @@ const gameFolderPicker = makeFolderPicker({
 				? window.__borgBoxCreateTauriDirHandleFromPath(dirnameOfPath(found.handle.__tauriPath))
 				: handle;
 			await ensureDefaultModSources(modsParentHandle);
+			// Nutzerbeobachtung: "при первом выборе папки с игрой не пересчитывается тут же
+			// автоматически папка с модами" + "кнопка подготовки копии... неактивна" (nach
+			// Auto-Detect ODER manueller Auswahl, beide laufen hier durch) - initClientPrepareField
+			// (Kopie-Vorbereiten-Button/Status) und initLnkLauncherField (automatisch erkannter
+			// Mods-Ordner-Pfad) lesen GAME_FOLDER_KEY nur einmalig beim (Wieder-)Aufbau ihres eigenen
+			// Feldes (siehe initGameFolderPicker) - blieben bisher also auf ihrem ALTEN Stand
+			// (deaktivierter Button/leerer Pfad) haengen, bis der Nutzer das ganze Panel schliesst und
+			// neu oeffnet. Beide Felder sind idempotent (bauen ihren Container komplett neu auf, lesen
+			// dabei den JETZT schon gespeicherten Ordner) - hier einfach erneut aufrufen, damit sie
+			// sofort den gerade aufgeloesten Ordner sehen.
+			const clientPrepareContainer = document.getElementById("clientPrepareField");
+			if (clientPrepareContainer) initClientPrepareField(clientPrepareContainer);
+			const lnkContainer = document.getElementById("lnkField");
+			if (lnkContainer) initLnkLauncherField(lnkContainer);
 			// Nutzerwunsch: "установленные моды в папке BepInEx/plugins нужно проверять... при
 			// подключении/подготовке папки для модификации" - nicht nur einmalig beim Programmstart
 			// (siehe initInterface), sondern auch JEDES MAL, wenn der Client-Ordner hier erfolgreich
@@ -8198,7 +8270,12 @@ function initHideLangNodeToggle(container) {
 // Pfad laengst bekannt (__tauriPath) und wird von initLnkLauncherField automatisch eingetragen
 // (siehe resolveModsFolderAbsolutePath unten) - Nutzerwunsch: "определяется точно и абсолютно, не
 // через браузер, поэтому... сделай автоматической определение и подстановку пути".
-function buildLnkLaunchCommand(username, modsPath) {
+// ccmPath/title siehe LNK_CCM_PATH_KEY/LNK_TITLE_KEY oben (Nutzerwunsch): ohne ccmPath unveraendertes
+// Verhalten (prime.exe direkt per -FilePath gestartet). Mit ccmPath wird stattdessen ueber cmd.exe
+// gestartet, damit prime.exe das zusaetzliche "-ccm <Datei>"-Argument bekommt UND (falls title
+// gesetzt) davor per "title" ein Fenstertitel gesetzt werden kann - siehe Kommentar am Rueckgabewert
+// unten dazu, WESSEN Fenstertitel das tatsaechlich ist.
+function buildLnkLaunchCommand(username, modsPath, ccmPath, title) {
 	const user = (username || "").trim();
 	let path = (modsPath || "").trim() || t("lnkLauncher.pathPlaceholder");
 	if (!path.endsWith("\\")) path += "\\";
@@ -8206,7 +8283,22 @@ function buildLnkLaunchCommand(username, modsPath) {
 	// ohne Angabe startet Start-Process ganz normal unter dem aktuellen Konto, ohne dass ein
 	// Platzhalter-Text den Befehl verfaelscht/unbrauchbar macht.
 	const credentialPart = user ? `-Credential ${user} ` : "";
-	return `powershell.exe "Start-Process ${credentialPart}-FilePath '${path}prime.exe' -WorkingDirectory '${path}'"`;
+	const ccm = (ccmPath || "").trim();
+	if (!ccm) return `powershell.exe "Start-Process ${credentialPart}-FilePath '${path}prime.exe' -WorkingDirectory '${path}'"`;
+
+	// "title" setzt NUR den Titel des cmd.exe-Konsolenfensters, das Start-Process hier oeffnet (per
+	// Default sichtbar, siehe -WindowStyle Normal-Standardwert) und das offen bleibt, solange
+	// prime.exe laeuft (kein "start" davor, cmd.exe wartet also) - NICHT den Titel des eigentlichen
+	// Spielfensters von prime.exe selbst (das setzt sein eigenes Fenster-Titel, davon unbeeinflusst).
+	// Zum Unterscheiden mehrerer gleichzeitig laufender Accounts/Server per Konsolenfenster reicht
+	// das trotzdem aus. "^&" (statt einem einfachen "&") ist noetig, weil dieser gesamte
+	// Befehlsstring als EINE Zeile in eine .bat-Datei geschrieben wird (siehe downloadLnkBatFile) -
+	// deren EIGENE (aeussere) cmd.exe-Auswertung wuerde ein unescaptes "&" sonst selbst als
+	// Befehlstrenner lesen und die Zeile mitten im String zerreissen, statt es unveraendert an das
+	// HIER gestartete (innere) cmd.exe weiterzureichen.
+	const rawTitle = (title || "").trim();
+	const titlePart = rawTitle ? `title ${rawTitle} ^& ` : "";
+	return `powershell.exe "Start-Process ${credentialPart}-FilePath 'cmd.exe' -WorkingDirectory '${path}' -ArgumentList '/c', '${titlePart}prime.exe -ccm ${ccm}'"`;
 }
 
 // Nur unter Tauri sinnvoll (siehe Aufrufer) - ermittelt den echten absoluten Pfad des
@@ -8233,24 +8325,60 @@ async function resolveModsFolderAbsolutePath() {
 // per WScript.Shell erzeugtes .lnk mit LinkTargetIDList funktioniert, und WScript.Shell ist aus
 // einem Browser heraus nicht erreichbar). Eine .bat-Datei mit demselben PowerShell-Aufruf erreicht
 // dasselbe Ergebnis (per Doppelklick startbar, kann ganz normal auf den Desktop verschoben oder
-// per Rechtsklick->Verknuepfung erstellen als echte .lnk verknuepft werden) und laesst sich
-// zuverlaessig als einfacher Text-Blob generieren.
-function downloadLnkBatFile(command) {
+// per Rechtsklick->Verknuepfung erstellen als echte .lnk verknuepft werden).
+// Nutzerbeobachtung ("Download .bat oeffnet keinen Speicherdialog" - unter Tauri zeigte der alte
+// <a download>-Blob-Trick ueberhaupt keinen Dialog, WebView2 handhabt Downloads anders als ein
+// echter Browser; siehe auch die AELTERE Beobachtung "schliesst einfach das Einstellungsfenster" -
+// derselbe <a>-Trick loeste zusaetzlich faelschlich den Klick-ausserhalb-schliesst-Panel-Listener
+// aus): genau wie downloadPersistentLog (siehe dort) jetzt ueber window.showSaveFilePicker - in der
+// PWA-Bauform der echte Browser-Speicherdialog, unter Tauri der native ueber den Polyfill (siehe
+// js/native-io.js) - beides ohne den <a>-Trick und dessen beide Nebenwirkungen. Liefert true bei
+// echtem Erfolg, false bei Abbruch (kein logAction-Eintrag in dem Fall, siehe initLnkLauncherField-
+// Aufrufer).
+async function downloadLnkBatFile(command) {
 	const content = "@echo off\r\n" + command + "\r\n";
-	const blob = new Blob([content], {type: "text/plain"});
-	const url = URL.createObjectURL(blob);
-	const a = document.createElement("a");
-	a.href = url;
-	a.download = "launch_stfc_mods.bat";
-	document.body.appendChild(a);
-	a.click();
-	a.remove();
-	setTimeout(() => URL.revokeObjectURL(url), 1000);
+	if (!window.showSaveFilePicker)
+	{
+		// Kein File System Access API und kein Tauri-Polyfill (sehr alter Browser) - alte
+		// Blob-<a download>-Methode als letzter Rueckfall. .clickable traegt hier keine eigene Optik
+		// (nur in Kombination mit .node, siehe main.css) - dient rein dazu, den Klick-ausserhalb-
+		// schliesst-Panel-Listener (siehe shortcuts.js) nicht faelschlich auszuloesen.
+		const blob = new Blob([content], {type: "text/plain"});
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement("a");
+		a.href = url;
+		a.download = "launch_stfc_mods.bat";
+		a.classList.add("clickable");
+		a.style.display = "none";
+		document.body.appendChild(a);
+		a.click();
+		a.remove();
+		setTimeout(() => URL.revokeObjectURL(url), 1000);
+		return true;
+	}
+	try
+	{
+		const handle = await window.showSaveFilePicker({
+			suggestedName: "launch_stfc_mods.bat",
+			types: [{ description: "Batch file", accept: { "text/plain": [".bat"] } }]
+		});
+		const writable = await handle.createWritable();
+		await writable.write(content);
+		await writable.close();
+		return true;
+	}
+	catch (err)
+	{
+		if (err.name === "AbortError") return false;
+		throw err;
+	}
 }
 
 function initLnkLauncherField(container) {
 	const savedUser = localStorage.getItem(LNK_USERNAME_KEY) || "";
 	const savedPath = localStorage.getItem(LNK_MODS_PATH_KEY) || "";
+	const savedCcm = localStorage.getItem(LNK_CCM_PATH_KEY) || "";
+	const savedTitle = localStorage.getItem(LNK_TITLE_KEY) || "";
 	container.innerHTML =
 		'<div class="folder-picker">' +
 			'<div class="folder-picker-label" id="lnkLabel"></div>' +
@@ -8259,6 +8387,14 @@ function initLnkLauncherField(container) {
 			'<input type="text" class="folder-name-input" id="lnkUsernameInput" placeholder="' + t("lnkLauncher.usernamePlaceholder") + '">' +
 			'<div class="folder-picker-hint" id="lnkHint1"></div>' +
 			'<input type="text" class="folder-name-input" id="lnkModsPathInput" placeholder="' + t("lnkLauncher.pathPlaceholder") + '">' +
+			'<div class="folder-picker-hint" id="lnkHintCcm"></div>' +
+			'<input type="text" class="folder-name-input" id="lnkCcmPathInput" placeholder="' + t("lnkLauncher.ccmPathPlaceholder") + '">' +
+			// Nutzerwunsch: nur sichtbar, wenn die CCM-Datei oben ueberhaupt gesetzt ist (siehe
+			// updateTitleFieldVisibility weiter unten) - startet also versteckt (hidden-Attribut,
+			// per [hidden]{display:none} vom UA-Stylesheet, main.css setzt hier kein eigenes
+			// display, ueberschreibt das also nicht).
+			'<div class="folder-picker-hint" id="lnkHintTitle" hidden></div>' +
+			'<input type="text" class="folder-name-input" id="lnkTitleInput" placeholder="' + t("lnkLauncher.titlePlaceholder") + '" hidden>' +
 			'<div class="folder-picker-hint" id="lnkHint2"></div>' +
 			// Gleiche Optik wie die anderen Felder (.folder-name-input), nur nicht editierbar
 			// (readonly) und mit einem kompakten Kopieren-Knopf DANEBEN statt eines eigenen
@@ -8276,16 +8412,32 @@ function initLnkLauncherField(container) {
 	revealElementText(document.getElementById("lnkAccountsHint"), t("lnkLauncher.accountsHint"), 500);
 	revealElementText(document.getElementById("lnkHint0"), t("lnkLauncher.usernameHint"), 450);
 	revealElementText(document.getElementById("lnkHint1"), t("lnkLauncher.pathHint"), 450);
+	revealElementText(document.getElementById("lnkHintCcm"), t("lnkLauncher.ccmPathHint"), 450);
+	revealElementText(document.getElementById("lnkHintTitle"), t("lnkLauncher.titleHint"), 450);
 	revealElementText(document.getElementById("lnkHint2"), t("lnkLauncher.commandHint"), 500);
 
 	const userInput = document.getElementById("lnkUsernameInput");
 	const pathInput = document.getElementById("lnkModsPathInput");
+	const ccmInput = document.getElementById("lnkCcmPathInput");
+	const titleHint = document.getElementById("lnkHintTitle");
+	const titleInput = document.getElementById("lnkTitleInput");
 	const commandBox = document.getElementById("lnkCommandBox");
 	userInput.value = savedUser;
 	pathInput.value = savedPath;
+	ccmInput.value = savedCcm;
+	titleInput.value = savedTitle;
+
+	// Nutzerwunsch: "если он указывается (не пустое), то добавляй поле для пометки окна запуска" -
+	// Titel-Feld nur anzeigen, wenn eine CCM-Datei eingetragen ist (siehe buildLnkLaunchCommand -
+	// ohne CCM gibt es keinen cmd.exe-Umweg und damit auch keinen Sinn fuer einen Konsolentitel).
+	function updateTitleFieldVisibility() {
+		const show = ccmInput.value.trim().length > 0;
+		titleHint.hidden = !show;
+		titleInput.hidden = !show;
+	}
 
 	function refreshCommand() {
-		commandBox.value = buildLnkLaunchCommand(userInput.value, pathInput.value);
+		commandBox.value = buildLnkLaunchCommand(userInput.value, pathInput.value, ccmInput.value, titleInput.value);
 	}
 	userInput.addEventListener("input", () => {
 		try { localStorage.setItem(LNK_USERNAME_KEY, userInput.value); } catch (_) {}
@@ -8295,6 +8447,16 @@ function initLnkLauncherField(container) {
 		try { localStorage.setItem(LNK_MODS_PATH_KEY, pathInput.value); } catch (_) {}
 		refreshCommand();
 	});
+	ccmInput.addEventListener("input", () => {
+		try { localStorage.setItem(LNK_CCM_PATH_KEY, ccmInput.value); } catch (_) {}
+		updateTitleFieldVisibility();
+		refreshCommand();
+	});
+	titleInput.addEventListener("input", () => {
+		try { localStorage.setItem(LNK_TITLE_KEY, titleInput.value); } catch (_) {}
+		refreshCommand();
+	});
+	updateTitleFieldVisibility();
 	refreshCommand();
 
 	// Nutzerwunsch: unter Tauri ist der absolute Pfad des Mods-Kopie-Ordners laengst exakt bekannt
@@ -8332,9 +8494,9 @@ function initLnkLauncherField(container) {
 			revealElementText(status, t("lnkLauncher.copyFailedPrefix") + err.message, 300);
 		}
 	});
-	document.getElementById("lnkDownloadBtn").addEventListener("click", () => {
-		logAction(logT("actionLog.lnkBatDownloaded"));
-		downloadLnkBatFile(commandBox.value);
+	document.getElementById("lnkDownloadBtn").addEventListener("click", async () => {
+		const saved = await downloadLnkBatFile(commandBox.value);
+		if (saved) logAction(logT("actionLog.lnkBatDownloaded"));
 	});
 }
 

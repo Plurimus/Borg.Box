@@ -263,6 +263,22 @@ fn remove_client_copy_folder(app: tauri::AppHandle, target: String) -> Result<u6
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+  // Nutzerbeobachtung: ein Windows-11-Pro-Nutzer sah nach Installation per NSIS/MSI (nicht bei der
+  // portablen exe) ein blaues Fenster mit kaputtem "IIS"-Bild statt der Oberflaeche. Ursache: der
+  // Installer legt die App standardmaessig unter "$PROGRAMFILES64\Borg.Box" ab (siehe installer.nsi),
+  // WebView2 versucht seinen User-Data-Ordner aber standardmaessig NEBEN der exe anzulegen - ohne
+  // Adminrechte schlaegt das dort fehl, die virtuelle "tauri.localhost"-Host-Zuordnung wird dann nie
+  // registriert, und die Navigation dorthin geht als ECHTE Netzwerkanfrage auf 127.0.0.1:80 raus
+  // (jede *.localhost-Adresse loest laut RFC 6761 auf Loopback auf) - landet dort ein echter IIS
+  // (haeufig als Windows-Feature auf Pro-Rechnern aktiviert), antwortet der mit seiner Standard-
+  // Startseite (blauer Hintergrund + "IIS"-Logo, exakt das gemeldete Symptom). Fix: WebView2 explizit
+  // einen garantiert beschreibbaren, installationsort-unabhaengigen Datenordner unter %LOCALAPPDATA%
+  // zuweisen - MUSS vor dem ersten Fenster gesetzt sein, da das WebView2-Environment dabei erzeugt wird.
+  if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
+    let webview_data_dir = std::path::Path::new(&local_app_data).join("Borg.Box").join("WebView2");
+    std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", webview_data_dir);
+  }
+
   tauri::Builder::default()
     .plugin(tauri_plugin_dialog::init())
     .plugin(tauri_plugin_fs::init())
