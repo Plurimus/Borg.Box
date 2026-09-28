@@ -1272,13 +1272,69 @@ async function initInterface() {
 	// automatisch aus (siehe applyLanguage(cornerNodeLanguageCode) am Funktionsende), statt still auf
 	// Englisch zu bleiben.
 	let noLanguageChosenYet = false;
-	const anchor = computeEdgeAnchoredCenter();
+	// Nutzerbeobachtung: "почему центральный хаб при загрузке главного экрана начинает с уголового
+	// режима? пусть начинает с цантрированного" - fruehendem lag das daran, dass der Hub erst NACH
+	// den Netzwerk-/Katalog-Awaits gebaut wurde (siehe applyLayoutMode('fit') am Funktionsende) und
+	// GENAU DORT unsichtbar (hinter dem noch blickdichten Boot-Overlay bzw. noch vor dem ersten
+	// Paint) von der Ecken- in die Fit-Position ueberging. Seit der Hub JETZT sofort (vor jedem
+	// Await) sichtbar wird (siehe Kommentar weiter unten), war dieser Uebergang zum ersten Mal
+	// SICHTBAR - der Hub erschien in der Ecke und "sprang" Sekunden spaeter ins Zentrum. Fix: schon
+	// hier direkt im Fit-Modus starten (kein Sprung mehr noetig) - layoutMode selbst wird ebenfalls
+	// schon hier auf 'fit' gesetzt, damit das applyLayoutMode('fit') am Funktionsende (dort bleibt es
+	// unveraendert stehen, fuer den Corner-Faceplate-Resize-Handler) ein No-Op ist statt einer
+	// zweiten, ueberfluessigen Uebergangsanimation.
+	layoutMode = 'fit';
+	// applyLayoutMode('fit') setzt normalerweise auch die aktive Optik des Umschalt-Knopfes - da der
+	// Aufruf am Funktionsende jetzt (layoutMode ist ja schon 'fit') ein No-Op ist, hier einmalig
+	// nachgeholt, sonst zeigte der Knopf faelschlich "Radial" an, obwohl tatsaechlich Fit aktiv ist.
+	const layoutToggleBtnEl = document.getElementById('layoutToggleBtn');
+	if (layoutToggleBtnEl) layoutToggleBtnEl.classList.add('active');
+	const anchor = computeFitAnchoredCenter();
 	config.center.x = anchor.x;
 	config.center.y = anchor.y;
 	// Branch-Laenge (Wurzel-Abstand + Kettenlaenge pro Glied) haengt prozentual von der echten
 	// Fensterbreite ab (siehe buildCatalogNodes in config.js) - darum erst hier, mit dem echten Hub
-	// UND der echten Fensterbreite, generieren statt schon beim Skript-Laden in config.js.
+	// UND der echten Fensterbreite, generieren statt schon beim Skript-Laden in config.js. Bleibt
+	// bewusst die VOLLE (nicht Fit-skalierte) Fensterbreite - config.nodes wird trotz Fit-Start unten
+	// weiterhin im vollen Radial-Massstab gebaut (siehe dortiger Kommentar), damit nodeBlueprint fuer
+	// einen spaeteren manuellen Wechsel zurueck in den Radial-Modus (Layout-Umschalter-Knopf) korrekte
+	// volle Referenzwerte behaelt.
 	radialVw = window.innerWidth || 1000;
+
+	// Nutzerbeobachtung: "при перезапуске или обновлении страницы... слишком долгая подгрузка... и
+	// всё виснет" - Hub/Sternenfeld/Radar-Pulse hingen bisher HINTER await ensureDefaultModSources/
+	// fetchAllCatalogEntries/scanLocalDirSourcesForStandaloneMods (Netzwerk-Fetch + ggf. langsamer
+	// lokaler Ordner-Scan) - bei langsamer Verbindung oder grossem lokalem Quellordner blieb der
+	// Bildschirm bis dahin BUCHSTAEBLICH leer (kein Hub, kein Sternenfeld), auch wenn skipBootAnim
+	// aktiv ist oder die feste Boot-Overlay-Dauer laenger als der eigentliche Ladevorgang braucht.
+	// Haengt NICHTS von config.nodes/dem Katalog ab (computeRadarMaxR/initRadarPulses/createFieldStars/
+	// createCoreIconGroup brauchen nur config.center + die Fensterbreite, beides schon oben gesetzt) -
+	// darum jetzt VOR jedem Await gezeichnet, damit der Hub sofort pulsiert, waehrend Katalog/lokale
+	// Quellen im Hintergrund laden.
+	radarMaxR = computeRadarMaxR();
+	initRadarPulses();
+	const nodesContainer = document.getElementById('nodesContainer');
+	nodesContainer.appendChild(createFieldStars());
+	const coreGroup = createSVGElement("g", {id: "coreGroup"});
+	coreIcon = createCoreIconGroup();
+	coreIcon.setAttribute('transform', `translate(${config.center.x},${config.center.y})`);
+	coreIcon.style.cursor = 'pointer';
+	coreIcon.addEventListener('mouseenter', () => { coreIcon.classList.add('core-icon-hot'); gearAttractTarget = 1; });
+	coreIcon.addEventListener('mouseleave', () => { coreIcon.classList.remove('core-icon-hot'); gearAttractTarget = 0; });
+	coreIcon.addEventListener('click', () => openPanel(config.center));
+	coreGroup.appendChild(coreIcon);
+	nodesContainer.appendChild(coreGroup);
+
+	// Nutzerwunsch: "моды должны автоматически подтягиваться с дефолтных источников и отображаться
+	// на главном экране до определения папки с клиентом игры" - ensureDefaultModSources trug die
+	// Standard-URL-Quelle ("Optimus mods") bisher NUR ein, wenn ein Client-Ordner erfolgreich
+	// gefunden wurde (siehe gameFolderPicker.resolve) - vor diesem Schritt war modSourcesMeta darum
+	// leer, fetchAllCatalogEntries direkt darunter hatte buchstaeblich nichts zum Laden, der Baum
+	// blieb bis zur Ordnerauswahl leer. Ohne gameParentHandle (hier: kein Client-Ordner-Handle
+	// vorhanden) ueberspringt die Funktion selbst nur den lokalen "mods"-Ordner-Zweig (der als
+	// GESCHWISTER des Client-Ordners sowieso erst DANN entstehen kann) - die URL-Quelle wird trotzdem
+	// sofort angelegt/migriert.
+	await ensureDefaultModSources(null);
 	// Baum kommt jetzt komplett aus dem echten Mod-Katalog (Nutzerwunsch: keine dekorativen
 	// Zufalls-Branches mehr) - eine Branche pro Mod-Id, ein Knoten pro Version. Ein Fetch-Fehler
 	// einzelner Quellen wird in fetchAllCatalogEntries selbst geloggt/uebersprungen, hier bleibt
@@ -1293,34 +1349,26 @@ async function initInterface() {
 	config.nodes = buildCatalogNodes(config.center, radialVw, catalogGroups);
 	scanLocalModCacheForHashMismatches(catalogEntries); // fire-and-forget, rein informativ (siehe dort)
 	scanCatalogEntriesForDownloadability(catalogEntries); // fire-and-forget, siehe dort (Nutzerwunsch: nicht erreichbare Mods ohne lokale Kopie sofort rot)
+	// Nutzerbeobachtung: "после первого запуска... не проверяет какие моды уже установлены" - VOR der
+	// reinen Bereinigung/Verifikation unten (die nur bereits bekannte Eintraege prueft) erst nach
+	// bisher UNBEKANNTEN, aber tatsaechlich vorhandenen Installationen suchen (siehe dort).
+	discoverPreexistingModInstalls(catalogEntries); // fire-and-forget, siehe dort
 	reconcileInstalledModsWithClientFolder(); // fire-and-forget, bereinigt+reconciled (siehe dort)
 
 	nodeBlueprint = new Map();
 	config.nodes.forEach(n => nodeBlueprint.set(n.id, {relX: n.x - config.center.x, relY: n.y - config.center.y}));
-
-	// 1. Radar-Pulse
-	radarMaxR = computeRadarMaxR();
-	initRadarPulses();
-
-	// 2. Zentrum
-	const nodesContainer = document.getElementById('nodesContainer');
-	// 1b. Sternenfeld (Nutzerwunsch: "звёздное небо... с мерцанием") - lebendige Ergaenzung zur
-	// rein statischen CSS-Schicht (.starfield, siehe main.css) - ueber den GANZEN SVG-Viewport
-	// verteilte, individuell funkelnde <circle>-Sterne, OHNE Bindung an die Hub-Drehung. Als
-	// allererstes Kind von nodesContainer eingefuegt (vor coreGroup/den Aesten), liegt darum
-	// hinter dem gesamten restlichen Baum.
-	nodesContainer.appendChild(createFieldStars());
-	const coreGroup = createSVGElement("g", {id: "coreGroup"});
-	coreIcon = createCoreIconGroup();
-	coreIcon.setAttribute('transform', `translate(${config.center.x},${config.center.y})`);
-	coreIcon.style.cursor = 'pointer';
-	coreIcon.addEventListener('mouseenter', () => { coreIcon.classList.add('core-icon-hot'); gearAttractTarget = 1; });
-	coreIcon.addEventListener('mouseleave', () => { coreIcon.classList.remove('core-icon-hot'); gearAttractTarget = 0; });
-	// Oeffnet dasselbe Infopanel wie ein Klick auf einen Knoten (siehe openPanel) - config.center
-	// traegt dafuer eigene title/text-Felder (siehe config.js), genau wie ein normaler Knoten.
-	coreIcon.addEventListener('click', () => openPanel(config.center));
-	coreGroup.appendChild(coreIcon);
-	nodesContainer.appendChild(coreGroup);
+	// config.nodes selbst kam von buildCatalogNodes im VOLLEN Radial-Massstab (siehe radialVw-
+	// Kommentar oben) - config.center/layoutMode stehen aber schon auf Fit. Ohne diesen Schritt
+	// bliebe der Baum bis zum naechsten (No-Op-freien) applyLayoutMode-Aufruf im vollen, nicht
+	// Fit-skalierten Massstab haengen (kein automatischer Uebergang mehr, siehe layoutMode='fit'
+	// oben) - hier darum EINMALIG, direkt/ohne Animation (die Knoten sind ueber
+	// animateNodeMaterialize ohnehin noch unsichtbar/r=0, ein Positionssprung faellt also nicht auf),
+	// derselbe k-Faktor wie applyLayoutMode('fit') angewandt.
+	const fitK = computeFitEffectiveVw() / radialVw;
+	config.nodes.forEach(n => {
+		const bp = nodeBlueprint.get(n.id);
+		if (bp) { n.x = config.center.x + bp.relX * fitK; n.y = config.center.y + bp.relY * fitK; }
+	});
 
 	// 4. Paths & Pulse - ein Wurzelknoten (eine Mod-Branche) bekommt seine Verbindung zum Hub
 	// NUR, wenn mindestens eine Version dieses Mods bereits installiert ist (Nutzerwunsch: Kreise
@@ -1690,6 +1738,20 @@ async function initInterface() {
 	// damit ein Reload denselben Zustand zeigt (Nutzerwunsch: "крупным кружком показывать ...
 	// установленную версию" gilt dauerhaft, nicht nur unmittelbar nach dem Klick).
 	Array.from(new Set(config.nodes.filter(n => n.modMeta).map(n => n.modMeta.modId))).forEach(reconcileBranchTipForModId);
+	// Nutzerwunsch: "кружки модов отрисовывать сразу с центрального и остальные - по порядку
+	// обнаружения (уже есть эффект появления\исчезновения из\в точки)" - alle Mod-Knoten kamen bisher
+	// gleichzeitig, ohne jede Animation, auf voller Groesse zur Welt (der Hub selbst erscheint dank
+	// der Umstellung weiter oben in dieser Funktion bereits sofort). Jetzt: Ziel-Radius merken, auf 0
+	// zuruecksetzen, dann nacheinander (Reihenfolge = config.nodes, also die Katalog-/Entdeckungs-
+	// Reihenfolge aus buildCatalogNodes) mit animateNodeMaterialize aus einem Punkt herauswachsen
+	// lassen - dieselbe Optik/Mechanik wie animateNodeVanish, nur umgekehrt.
+	config.nodes.filter(n => n.modMeta).forEach((node, i) => {
+		const targetR = node.r;
+		const st = nodeHoverState.get(node.id);
+		node.r = 0;
+		if (st) { st.baseR = 0; st.t = 0; st.target = 0; }
+		setTimeout(() => animateNodeMaterialize(node.id, targetR), i * NODE_MATERIALIZE_STAGGER_MS);
+	});
 	// Zentrum, Ikone und alle Root-Pfade an eine neue Position bringen - genutzt vom
 	// Resize-Handler (Ecken-Andockung). Der Hub selbst ist nicht mehr draggable (fixiert),
 	// darum gibt es hier keinen Drag-Handler mehr. Die Radar-Pulse lesen config.center bei
@@ -2654,7 +2716,13 @@ function tickInteraction(now) {
 	nodeHoverState.forEach((st, id) => {
 		st.t += (st.target - st.t) * NODE_HOVER_EASE;
 		if (Math.abs(st.target - st.t) < 0.001) st.t = st.target;
-		st.currentR = st.baseR + (NODE_HOVER_R - st.baseR) * st.t;
+		// Math.max(0, ...) - Nutzerbeobachtung (Konsolenfehler): "<circle> attribute r: A negative
+		// value is not valid" trat auf, sobald mehrere Knoten gleichzeitig mit baseR=0 starteten (siehe
+		// animateNodeMaterialize) - winzige negative Werte durch Gleitkomma-/Ueberlappungskorrektur bei
+		// nahe-0-Radien. r war nie legitim negativ, darum hier hart abgesichert statt die Ursache in
+		// jedem einzelnen Aufrufer (Attribut setzen, Icon-Skalierung, Ueberlappungsradius) einzeln zu
+		// pruefen.
+		st.currentR = Math.max(0, st.baseR + (NODE_HOVER_R - st.baseR) * st.t);
 	});
 
 	// 2) Ueberlappungen anhand der aktuellen (gedrehten) Basispositionen JEDEN Frame vollstaendig
@@ -3348,6 +3416,7 @@ const I18N_PACKS = {
 
 		noData: "НЕТ ДАННЫХ",
 		modAuthorPrefix: "Автор: ",
+		modSourcePrefix: "Источник: ",
 		modLocalOnlyNote: "Найден локально, источник не подтверждён.",
 		disconnectBtn: "ОТКЛЮЧИТЬ",
 		installBtn: "УСТАНОВИТЬ",
@@ -3739,6 +3808,7 @@ const I18N_PACKS = {
 
 		noData: "NO DATA",
 		modAuthorPrefix: "Author: ",
+		modSourcePrefix: "Source: ",
 		modLocalOnlyNote: "Found locally, source not verified.",
 		disconnectBtn: "DISCONNECT",
 		installBtn: "INSTALL",
@@ -4130,6 +4200,7 @@ const I18N_PACKS = {
 
 		noData: "KEINE DATEN",
 		modAuthorPrefix: "Autor: ",
+		modSourcePrefix: "Quelle: ",
 		disconnectBtn: "TRENNEN",
 		layoutToggleTitle: "Anzeigemodus wechseln",
 		coreTitle: "Zentraler Plexus",
@@ -4470,6 +4541,7 @@ const I18N_PACKS = {
 
 		noData: "NESSUN DATO",
 		modAuthorPrefix: "Autore: ",
+		modSourcePrefix: "Fonte: ",
 		disconnectBtn: "DISCONNETTI",
 		layoutToggleTitle: "Cambia modalità di visualizzazione",
 		coreTitle: "Plesso centrale",
@@ -4810,6 +4882,7 @@ const I18N_PACKS = {
 
 		noData: "AUCUNE DONNÉE",
 		modAuthorPrefix: "Auteur : ",
+		modSourcePrefix: "Source : ",
 		disconnectBtn: "DÉCONNECTER",
 		layoutToggleTitle: "Changer le mode d'affichage",
 		coreTitle: "Plexus central",
@@ -5150,6 +5223,7 @@ const I18N_PACKS = {
 
 		noData: "SIN DATOS",
 		modAuthorPrefix: "Autor: ",
+		modSourcePrefix: "Fuente: ",
 		disconnectBtn: "DESCONECTAR",
 		layoutToggleTitle: "Cambiar modo de visualización",
 		coreTitle: "Plexo central",
@@ -5490,6 +5564,7 @@ const I18N_PACKS = {
 
 		noData: "SEM DADOS",
 		modAuthorPrefix: "Autor: ",
+		modSourcePrefix: "Fonte: ",
 		disconnectBtn: "DESCONECTAR",
 		layoutToggleTitle: "Alternar modo de exibição",
 		coreTitle: "Plexo central",
@@ -5830,6 +5905,7 @@ const I18N_PACKS = {
 
 		noData: "데이터 없음",
 		modAuthorPrefix: "제작자: ",
+		modSourcePrefix: "출처: ",
 		disconnectBtn: "연결 해제",
 		layoutToggleTitle: "레이아웃 모드 전환",
 		coreTitle: "중앙 플렉서스",
@@ -6170,6 +6246,7 @@ const I18N_PACKS = {
 
 		noData: "无数据",
 		modAuthorPrefix: "作者：",
+		modSourcePrefix: "来源：",
 		disconnectBtn: "断开连接",
 		layoutToggleTitle: "切换布局模式",
 		coreTitle: "中央神经丛",
@@ -6510,6 +6587,7 @@ const I18N_PACKS = {
 
 		noData: "データなし",
 		modAuthorPrefix: "作者: ",
+		modSourcePrefix: "ソース: ",
 		disconnectBtn: "切断",
 		layoutToggleTitle: "レイアウトモードを切り替え",
 		coreTitle: "中央プレクサス",
@@ -7806,6 +7884,11 @@ const gameFolderPicker = makeFolderPicker({
 			// подключении/подготовке папки для модификации" - nicht nur einmalig beim Programmstart
 			// (siehe initInterface), sondern auch JEDES MAL, wenn der Client-Ordner hier erfolgreich
 			// (neu) gefunden/bestaetigt wird (z.B. nach manuellem Auswaehlen eines anderen Ordners).
+			// Nutzerbeobachtung: "после... определения папок не проверяет какие моды уже установлены" -
+			// erst nach bisher UNBEKANNTEN Installationen suchen (kein catalogEntries hier im Scope,
+			// discoverPreexistingModInstalls laedt den Katalog in dem Fall selbst nach), dann wie
+			// gehabt bereits bekannte Eintraege verifizieren.
+			discoverPreexistingModInstalls(); // fire-and-forget, siehe dort
 			reconcileInstalledModsWithClientFolder(); // fire-and-forget, siehe dort
 		}
 		catch (err)
@@ -9073,6 +9156,7 @@ function groupCatalogEntriesByMod(entries) {
 						signature: rep.signature,
 						minGameVersion: rep.minGameVersion,
 						sourceId: rep.sourceId,
+						sourceLabel: rep.sourceLabel,
 						sourceRef: rep.sourceRef,
 						sourceBaseUrl: rep.sourceBaseUrl,
 						sourceDirHandle: rep.sourceDirHandle,
@@ -9118,6 +9202,10 @@ function buildModNodeText(m) {
 	// eine einzelne Zusatzzeile).
 	const authorName = (m.authorMeta && m.authorMeta.name) || m.authorId || "";
 	let text = desc + (authorName ? (desc ? "\n" : "") + t("modAuthorPrefix") + authorName : "");
+	// Nutzerwunsch: "добавь... строку с указанием источника этого мода (имя ресурса)" - sourceLabel
+	// traegt bereits jeder Katalog-Eintrag (fetchAllCatalogEntries/scanLocalDirSourcesForStandaloneMods),
+	// hier nur zusaetzlich als eigene, uebersetzte Zeile angehaengt.
+	if (m.sourceLabel) text += (text ? "\n" : "") + t("modSourcePrefix") + m.sourceLabel;
 	if (m.localOnly) text += (text ? "\n" : "") + t("modLocalOnlyNote");
 	return text;
 }
@@ -9637,6 +9725,38 @@ function animateNodeVanish(nodeId) {
 		if (st) { st.baseR = shrunk; st.t = 0; st.target = 0; }
 		if (t < 1) requestAnimationFrame(tick);
 		else removeNodeFromTree(nodeId);
+	}
+	requestAnimationFrame(tick);
+}
+
+// Gegenstueck zu animateNodeVanish (waechst AUS einem Punkt statt zu einem zu schrumpfen) -
+// Nutzerwunsch: "кружки модов отрисовывать сразу с центрального и остальные - по порядку
+// обнаружения (уже есть эффект появления\исчезновения из\в точки)". Nutzt denselben Trick wie
+// animateNodeVanish: node.r/nodeHoverState.baseR direkt setzen statt das <circle>-r-Attribut,
+// tickInteraction uebernimmt das Neuzeichnen jeden Frame (siehe dortiger Kommentar) - darum
+// funktioniert das auch fuer das gerade erst frisch angehaengte Branch-Icon-Overlay, dessen
+// Skalierung ebenfalls an derselben currentR haengt.
+const NODE_MATERIALIZE_DURATION_MS = 500;
+// Verzoegerung ZWISCHEN dem Start je zweier aufeinanderfolgender Knoten (nicht die Animationsdauer
+// selbst) - bei z.B. 40 Knoten macht das 40*18ms=720ms Gesamt-Staffelung, spuerbar als "nacheinander"
+// ohne den Aufbau spuerbar zu verlangsamen.
+const NODE_MATERIALIZE_STAGGER_MS = 18;
+function animateNodeMaterialize(nodeId, targetR) {
+	const node = config.nodes.find(n => n.id === nodeId);
+	if (!node) return;
+	// KEIN firePulsarBurst hier (anders als beim einzelnen Installieren, siehe
+	// queueBranchConnectAnimation) - beim ersten Aufbau materialisieren potenziell 40+ Knoten
+	// innerhalb von unter einer Sekunde, ein Ring-Burst PRO Knoten ergab optisch ein ueberladenes
+	// "Blumenmuster" aus lauter ueberlappenden Ringen statt einer ruhigen Reihe einzeln
+	// erscheinender Kreise (per Screenshot geprueft).
+	const st = nodeHoverState.get(nodeId);
+	const start = performance.now();
+	function tick(now) {
+		const t = Math.min(1, (now - start) / NODE_MATERIALIZE_DURATION_MS);
+		const grown = targetR * easeOutCubic(t);
+		node.r = grown;
+		if (st) { st.baseR = grown; st.t = 0; st.target = 0; }
+		if (t < 1) requestAnimationFrame(tick);
 	}
 	requestAnimationFrame(tick);
 }
@@ -10756,13 +10876,206 @@ async function reconcileInstalledModsWithClientFolder() {
 		}
 
 		const affectedModIds = new Set(installed.map((r) => r.modId));
-		affectedModIds.forEach((modId) => reconcileBranchTipForModId(modId));
+		// Nutzerbeobachtung: "не происходит... сравнение... В результате связь не строится" -
+		// reconcileBranchTipForModId aendert nur Groesse/Farbe EINES bereits vorhandenen Astes, zeichnet
+		// aber NIE den Wurzel-zu-Hub-Pfad selbst (der entsteht sonst nur einmalig synchron in
+		// initInterface ODER ueber installModVersion->queueBranchConnectAnimation). Diese Funktion laeuft
+		// dagegen IMMER asynchron NACH jenem einmaligen Zeichen-Durchlauf (fire-and-forget, siehe
+		// Aufrufer) - ohne diesen Aufruf hier blieb ein bereits laut INSTALLED_MODS_KEY installierter Mod
+		// darum optisch dauerhaft "nicht verbunden", selbst nach einem Neustart. animateBranchConnected
+		// ist idempotent (no-op, wenn der Pfad schon existiert), darum hier einfach fuer JEDE betroffene
+		// Mod-Id aufgerufen statt nur fuer tatsaechlich geaenderte.
+		affectedModIds.forEach((modId) => { reconcileBranchTipForModId(modId); animateBranchConnected(modId); });
 
 		logAction("Installed-mods reconciliation done: checked " + checked + " target file(s) across " + byModId.size + " mod(s), " + missingFiles + " missing file(s) found.");
 	}
 	catch (err)
 	{
 		logAction("Installed-mods reconciliation failed: " + formatErrorDetail(err));
+	}
+}
+
+// Nutzerbeobachtung: "после первого запуска и определения папок не проверяет какие моды уже
+// установлены и не рисует подключенные связи для установленных модов" - reconcileInstalledModsWithClientFolder
+// (siehe oben) prueft NUR bereits BEKANNTE INSTALLED_MODS_KEY-Eintraege gegen die echten Dateien und
+// gibt bei einem leeren Verlauf (z.B. ein frischer Borg.Box-Profilstand, obwohl der Client-Ordner von
+// einer frueheren Installation/einem anderen Tool schon modifiziert ist) sofort auf - entdeckt NIE
+// unbekannte, aber tatsaechlich vorhandene Installationen. Diese Funktion schliesst genau diese Luecke:
+// liest jede .dll unter BepInEx/plugins und BepInEx/patchers per ECMA-335-Parser (parseDotNetAssemblyMetadata,
+// bislang nur im Baumodul zum Anlegen eigener Mods genutzt), erkennt darueber GUID/Version echter
+// BepInEx-Plugins OHNE irgendetwas herunterzuladen, und traegt fuer jede Mod-Id, die noch KEINEN
+// INSTALLED_MODS_KEY-Eintrag hat, aber sowohl im geladenen Katalog als auch als installierte Datei mit
+// exakt passender Version gefunden wird, einen neuen Eintrag nach - reconcileBranchTipForModId zeigt den
+// Baum danach korrekt an (grosser Knoten statt "nicht installiert"). Deckt BEIDE Mod-Typen ab: Typ 0
+// (echte BepInEx-Plugins) ueber ihr [BepInPlugin(GUID, Name, Version)]-Attribut (siehe Scan unten,
+// kein Download noetig), Typ 1 (Community-Patches wie netniV.stfc-mod's version.dll, ohne dieses
+// Attribut) ueber die native Win32-VERSIONINFO-Ressource der Zieldatei (siehe zweiter Scan weiter
+// unten - braucht dafuer einmalig das Manifest der neuesten Version, um den Ziel-Pfad zu kennen).
+// catalogEntries optional - wird selbst nachgeladen, wenn nicht mitgegeben (siehe Aufrufer).
+async function discoverPreexistingModInstalls(catalogEntries) {
+	try
+	{
+		const gameHandle = await loadFolderHandle(GAME_FOLDER_KEY);
+		if (!gameHandle) { logAction("Pre-existing install discovery skipped: no game folder configured yet."); return; }
+		if (!(await queryFolderPermission(gameHandle, false))) { logAction("Pre-existing install discovery skipped: game folder permission not granted."); return; }
+		let copyHandle, copyName;
+		try { ({copyHandle, copyName} = await resolveModInstallTargetHandle(gameHandle)); }
+		catch (err) { logAction("Pre-existing install discovery skipped: " + formatErrorDetail(err)); return; }
+
+		if (!catalogEntries) catalogEntries = await fetchAllCatalogEntries();
+		const byId = new Map(); // modId -> Map(version -> catalogEntry)
+		for (const e of catalogEntries)
+		{
+			if (!byId.has(e.id)) byId.set(e.id, new Map());
+			byId.get(e.id).set(e.version, e);
+		}
+		if (!byId.size) { logAction("Pre-existing install discovery skipped: catalog is empty (no sources reachable)."); return; }
+
+		const alreadyTracked = new Set(loadInstalledMods().map((r) => r.modId));
+
+		// Nur unter BepInEx/plugins und BepInEx/patchers suchen - die einzigen echten
+		// Installationsziele fuer Typ-0-Mods (siehe installModVersion). Begrenzte Tiefe (manche Mods
+		// wie UnityExplorer legen ihre DLL eine Ebene tiefer in einem eigenen Unterordner ab, siehe
+		// deren installFiles[].target) statt unbegrenzter Rekursion.
+		const roots = [];
+		let bepInExHandle;
+		try { bepInExHandle = await copyHandle.getDirectoryHandle("BepInEx"); }
+		catch (err) { logAction("Pre-existing install discovery: no BepInEx folder under \"" + copyName + "\" (" + formatErrorDetail(err) + ") - nothing to scan for type-0 mods."); bepInExHandle = null; }
+		if (bepInExHandle) for (const name of ["plugins", "patchers"])
+		{
+			try { roots.push(await bepInExHandle.getDirectoryHandle(name)); }
+			catch (_) { /* Ordner existiert (noch) nicht - nichts zu durchsuchen */ }
+		}
+		if (!roots.length) logAction("Pre-existing install discovery: no BepInEx/plugins or BepInEx/patchers found under \"" + copyName + "\" - skipping type-0 scan (type-1 scan below still runs).");
+
+		const dllEntries = [];
+		async function walk(dirHandle, rel, depth) {
+			if (depth > 4) return;
+			for await (const [name, handle] of dirHandle.entries())
+			{
+				const childRel = rel + "/" + name;
+				if (handle.kind === "directory") await walk(handle, childRel, depth + 1);
+				else if (name.toLowerCase().endsWith(".dll")) dllEntries.push({ rel: childRel, handle });
+			}
+		}
+		for (const root of roots) await walk(root, "BepInEx/" + root.name, 0);
+
+		let discovered = 0;
+		const newlyDiscoveredModIds = [];
+		for (const entry of dllEntries)
+		{
+			let info;
+			try
+			{
+				const file = await entry.handle.getFile();
+				info = parseDotNetAssemblyMetadata(await file.arrayBuffer());
+			}
+			catch (_) { continue; } // keine .NET-Assembly / kein lesbares Attribut - ueberspringen, kein Fehler
+			if (!info || !info.guid || alreadyTracked.has(info.guid)) continue;
+			const versions = byId.get(info.guid);
+			if (!versions || !versions.has(info.version)) continue; // nicht im geladenen Katalog / unbekannte Version
+
+			const catalogEntry = versions.get(info.version);
+			const list = loadInstalledMods();
+			list.push({
+				authorId: catalogEntry.authorId || "",
+				modId: info.guid,
+				version: info.version,
+				sourceId: catalogEntry.sourceId || null,
+				installedAt: new Date().toISOString(),
+				targets: [entry.rel]
+			});
+			saveInstalledMods(list);
+			alreadyTracked.add(info.guid);
+			newlyDiscoveredModIds.push(info.guid);
+			discovered++;
+			logAction("Discovered pre-existing install: " + info.guid + " v" + info.version + " at \"" + copyName + "/" + entry.rel + "\" (not previously tracked by Borg.Box).");
+		}
+
+		// Nutzerwunsch: "community-patch вроде netniV.stfc-mod's version.dll имеет версию в свойствах
+		// файла" - Typ-1-Mods tragen KEIN [BepInPlugin(...)]-Attribut (siehe Scan oben, der sie darum
+		// nie findet), ihre Version steckt stattdessen in der nativen Win32-VERSIONINFO-Ressource
+		// (FileVersion/ProductVersion, siehe parseWin32VersionInfo - bislang nur im Baumodul genutzt;
+		// am echten netniV.stfc-mod-DLL geprueft: liefert exakt denselben Versions-String wie
+		// catalog.json, z.B. "1.1.8.0"). Anders als bei Typ-0 ist ihr Ziel-Pfad aber NICHT
+		// algorithmisch vorhersagbar (keine feste Ordner-/Namenskonvention, siehe stfc-mod-source
+		// README "type... 1 for a community patch, installs into the client root") - dafuer muss
+		// EINMAL das Manifest der neuesten bekannten Version dieser Mod-Id geladen werden (dort steht
+		// installFiles[] drin), danach reicht ein reiner Datei-Existenz-Check + lokale Versionslesung,
+		// kein erneuter Download. Nur fuer Mod-Ids versucht, die noch KEINEN INSTALLED_MODS_KEY-Eintrag
+		// haben (wie oben) - kostet also hoechstens einmal pro Profil pro Mod-Id einen Download.
+		for (const [modId, versions] of byId)
+		{
+			if (alreadyTracked.has(modId)) continue;
+			const entriesForId = Array.from(versions.values());
+			if (!entriesForId.some((e) => e.type === 1)) continue; // Typ-0 bereits oben abgedeckt
+
+			const latest = entriesForId.reduce((best, e) => (compareModVersions(e.version, best.version) > 0 ? e : best));
+			let manifest;
+			try
+			{
+				const bytes = await fetchArchiveBytes(latest);
+				const zipEntries = readZipEntries(bytes);
+				const manifestEntry = zipEntries.find((e) => e.name === "manifest.json");
+				if (!manifestEntry) continue;
+				manifest = JSON.parse(new TextDecoder().decode(manifestEntry.data));
+			}
+			catch (_) { continue; } // kein Download moeglich (offline, kein archive-Feld, ...) - kein Fehlerfall
+
+			for (const f of (manifest.installFiles || []))
+			{
+				const parts = String(f.target || "").split("/").filter(Boolean);
+				if (!parts.length) continue;
+				let fileHandle;
+				try
+				{
+					let cur = copyHandle;
+					for (let i = 0; i < parts.length - 1; i++) cur = await cur.getDirectoryHandle(parts[i]);
+					fileHandle = await cur.getFileHandle(parts[parts.length - 1]);
+				}
+				catch (_) { continue; } // Zieldatei existiert nicht - nicht installiert
+
+				let foundVersion = null;
+				try
+				{
+					const buffer = await (await fileHandle.getFile()).arrayBuffer();
+					const nativeInfo = parseWin32VersionInfo(buffer);
+					const nativeVersion = nativeInfo.ProductVersion || nativeInfo.FileVersion || "";
+					if (nativeVersion && versions.has(nativeVersion)) foundVersion = nativeVersion;
+				}
+				catch (_) { /* Datei nicht lesbar/keine VERSIONINFO-Ressource - ueberspringen */ }
+				if (!foundVersion) continue;
+
+				const catalogEntry = versions.get(foundVersion);
+				const list = loadInstalledMods();
+				list.push({
+					authorId: catalogEntry.authorId || "",
+					modId,
+					version: foundVersion,
+					sourceId: catalogEntry.sourceId || null,
+					installedAt: new Date().toISOString(),
+					targets: [f.target]
+				});
+				saveInstalledMods(list);
+				alreadyTracked.add(modId);
+				newlyDiscoveredModIds.push(modId);
+				discovered++;
+				logAction("Discovered pre-existing install: " + modId + " v" + foundVersion + " at \"" + copyName + "/" + f.target + "\" (native file version, not previously tracked by Borg.Box).");
+				break; // ein passender Treffer reicht fuer diese Mod-Id
+			}
+		}
+
+		// animateBranchConnected zusaetzlich zu reconcileBranchTipForModId - siehe ausfuehrlichen
+		// Kommentar in reconcileInstalledModsWithClientFolder: ohne das blieb ein hier neu entdeckter
+		// Mod als Datensatz zwar korrekt in INSTALLED_MODS_KEY, aber optisch nie mit dem Hub verbunden
+		// (der Wurzel-zu-Hub-Pfad entsteht sonst nur einmalig synchron VOR dieser fire-and-forget-
+		// Funktion, siehe initInterface).
+		if (discovered) newlyDiscoveredModIds.forEach((modId) => { reconcileBranchTipForModId(modId); animateBranchConnected(modId); });
+		logAction("Pre-existing install discovery done under \"" + copyName + "\": " + dllEntries.length + " DLL(s) scanned, " + discovered + " newly discovered.");
+	}
+	catch (err)
+	{
+		logAction("Pre-existing install discovery failed: " + formatErrorDetail(err));
 	}
 }
 
@@ -14311,6 +14624,13 @@ function initTicketField(container) {
 			includedLogs,
 			extraFiles: extraFiles.map((f) => f.name)
 		};
+		// Nutzerwunsch: "нужно добавить само описание пользователя на случай отправки на адрес без
+		// текста сообщения" - steht zwar schon in ticket.json, aber NICHT-Discord-Ziele bekommen beim
+		// Versand ueberhaupt keinen Text mit (siehe sendBtn-Handler, nur "file"+"id" als Formularfelder)
+		// - eine eigene, sofort lesbare Klartextdatei stellt sicher, dass die Beschreibung dort trotzdem
+		// ankommt, ohne dass der Empfaenger extra ticket.json parsen muesste. Nur bei tatsaechlich
+		// vorhandenem Text (leere Datei waere nutzlos).
+		if (meta.description) entries.unshift({ name: "description.txt", data: new TextEncoder().encode(meta.description) });
 		entries.unshift({ name: "ticket.json", data: new TextEncoder().encode(JSON.stringify(meta, null, 2)) });
 
 		const pad2 = (n) => String(n).padStart(2, "0");
@@ -14372,7 +14692,12 @@ function initTicketField(container) {
 		const maxDescLen = 1500;
 		let desc = meta.description || "(no description)";
 		if (desc.length > maxDescLen) desc = desc.slice(0, maxDescLen) + "…";
-		let content = "**Borg.Box Bug-Report** - id `" + meta.id + "`, " + meta.createdAt + "\n" + desc;
+		// Nutzerwunsch: "формат сообщения... не в одну строку" - eigene Zeile je Feld statt allem in
+		// einer Zeile zusammengequetscht, besser lesbar in Discord. createdAt ist bereits ein
+		// toISOString()-String ("YYYY-MM-DDTHH:mm:ss.sssZ") - T/Z durch Leerzeichen/" UTC" ersetzen
+		// reicht, kein erneutes Datum-Parsen noetig.
+		const readableDate = meta.createdAt.replace("T", " ").replace("Z", " UTC");
+		let content = "**Borg.Box Bug-Report**\nid - `" + meta.id + "`\n" + readableDate + "\n" + desc;
 		if (meta.linkedTicketId) content += "\nLinked to archive id `" + meta.linkedTicketId + "`";
 		if (content.length > 2000) content = content.slice(0, 1997) + "…";
 		return content;

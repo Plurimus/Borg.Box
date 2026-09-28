@@ -1,25 +1,13 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Borg.Box",
-  "version": "1.0.322",
+  "version": "1.0.333",
   "identifier": "space.borgbox.desktop",
   "build": {
     "frontendDist": "../Borg.Box"
   },
   "app": {
     "withGlobalTauri": true,
-    "windows": [
-      {
-        "title": "Borg.Box - Mods Manager",
-        "width": 1400,
-        "height": 900,
-        "minWidth": 900,
-        "minHeight": 600,
-        "resizable": true,
-        "maximizable": true,
-        "fullscreen": false
-      }
-    ],
     "security": {
       "csp": null
     }

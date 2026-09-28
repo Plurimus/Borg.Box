@@ -274,9 +274,13 @@ pub fn run() {
   // Startseite (blauer Hintergrund + "IIS"-Logo, exakt das gemeldete Symptom). Fix: WebView2 explizit
   // einen garantiert beschreibbaren, installationsort-unabhaengigen Datenordner unter %LOCALAPPDATA%
   // zuweisen - MUSS vor dem ersten Fenster gesetzt sein, da das WebView2-Environment dabei erzeugt wird.
-  if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
-    let webview_data_dir = std::path::Path::new(&local_app_data).join("Borg.Box").join("WebView2");
-    std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", webview_data_dir);
+  // webview_data_dir wird unten im setup()-Block erneut gebraucht (Selbstheilung bei kaputtem
+  // Profil, siehe on_navigation) - deshalb hier als Pfad gemerkt, nicht nur inline gebaut.
+  let webview_data_dir = std::env::var("LOCALAPPDATA")
+    .ok()
+    .map(|local_app_data| std::path::Path::new(&local_app_data).join("Borg.Box").join("WebView2"));
+  if let Some(dir) = &webview_data_dir {
+    std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", dir);
   }
 
   tauri::Builder::default()
@@ -288,7 +292,7 @@ pub fn run() {
       copy_client_folder,
       remove_client_copy_folder
     ])
-    .setup(|app| {
+    .setup(move |app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(
           tauri_plugin_log::Builder::default()
@@ -296,6 +300,63 @@ pub fn run() {
             .build(),
         )?;
       }
+
+      // Nutzerbeobachtung: "работало один раз, потом при повторном открытии - ничего, помогало ни
+      // переустановка, ни portable-версия" - alle Varianten teilen sich seit dem WEBVIEW2_USER_DATA_
+      // FOLDER-Fix oben denselben festen Profilordner; wird der (z.B. durch einen unsauberen
+      // vorherigen Abbruch, Antivirus-Eingriff oder eine kaputte Profil-Datenbank) beschaedigt,
+      // bleibt er das ueber JEDE Neuinstallation hinweg (Deinstallation loescht nur die App, nicht
+      // %LOCALAPPDATA%) - jeder weitere Start scheitert dann sofort wieder. Symptom: die virtuelle
+      // "tauri.localhost"-Zuordnung wird nie registriert, die Navigation faellt als ECHTE
+      // Netzwerkanfrage auf eine andere Adresse durch (siehe grosser Kommentar oben). on_navigation
+      // faengt das ab: JEDE Navigation, die nicht auf unsere eigene App-Adresse geht, ist im
+      // RELEASE-Build ein sicheres Zeichen genau dafuer - per Messung bestaetigt (echter Release-Build,
+      // stdout umgeleitet): die gesunde Navigation lautet exakt "http://tauri.localhost/", die App
+      // selbst navigiert nie woanders hin (externe Links tragen alle target="_blank", siehe main.js,
+      // oeffnen also nie das Hauptfenster selbst um). NUR im Release-Build aktiv (cfg!(debug_assertions)
+      // false) - "tauri dev" nutzt einen eigenen lokalen Dev-Server (gemessen: http://127.0.0.1:<port>/,
+      // NICHT tauri.localhost) - eine strikte Pruefung wuerde dort bei JEDEM "cargo tauri dev" faelschlich
+      // sofort das (im Dev-Fall voellig gesunde) Profil loeschen und die App beenden, siehe Chat-Historie.
+      let webview_data_dir_for_nav = webview_data_dir.clone();
+      let app_handle_for_nav = app.handle().clone();
+      tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::App("index.html".into()))
+        .title("Borg.Box - Mods Manager")
+        .inner_size(1400.0, 900.0)
+        .min_inner_size(900.0, 600.0)
+        .resizable(true)
+        .maximizable(true)
+        .on_navigation(move |url| {
+          if cfg!(debug_assertions) { return true; }
+          let is_own_origin = url.scheme() == "tauri" || url.host_str() == Some("tauri.localhost");
+          if !is_own_origin
+          {
+            // Kaputte Navigation SOFORT blockieren (return false) - verhindert, dass die verwirrende
+            // Fremdseite (z.B. ein lokaler IIS) je gerendert wird. Der eigentliche Reparaturversuch
+            // (Profil loeschen + Nutzer informieren) laeuft bewusst auf einem EIGENEN Thread, nicht
+            // hier direkt im Navigations-Callback - ein blockierender nativer Dialog waere innerhalb
+            // dieses WebView2-Events riskant (moeglicher Reentrancy-/Deadlock-Fall).
+            let dir = webview_data_dir_for_nav.clone();
+            let handle = app_handle_for_nav.clone();
+            let bad_url = url.to_string();
+            std::thread::spawn(move || {
+              if let Some(dir) = dir { let _ = std::fs::remove_dir_all(&dir); }
+              use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
+              handle
+                .dialog()
+                .message(format!(
+                  "Borg.Box's internal browser profile appears to be corrupted and has been reset (attempted to load: {}).\n\nPlease restart Borg.Box.",
+                  bad_url
+                ))
+                .kind(MessageDialogKind::Error)
+                .title("Borg.Box")
+                .blocking_show();
+              std::process::exit(1);
+            });
+          }
+          is_own_origin
+        })
+        .build()?;
+
       Ok(())
     })
     .run(tauri::generate_context!())

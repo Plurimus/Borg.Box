@@ -1,6 +1,6 @@
 # Borg.Box
 
-A PWA (installable, offline-capable) wrapper around the **Borg Neural Tree Interface** demo.
+The frontend for the **Borg.Box** Tauri desktop app (STFC mod manager), built on top of the **Borg Neural Tree Interface** demo. Served as-is by the Tauri shell in `../src-tauri` (`frontendDist` points here) - no bundler, no build step.
 
 - Upstream SDK: https://github.com/JBlond/borg-html-sdk
 - Live upstream demo: https://jblond.github.io/borg-html-sdk/
@@ -8,25 +8,19 @@ A PWA (installable, offline-capable) wrapper around the **Borg Neural Tree Inter
 
 ## What was added on top of the SDK
 
-- [`manifest.webmanifest`](manifest.webmanifest) — PWA manifest (name, icons, standalone display, theme colors)
-- [`service-worker.js`](service-worker.js) — cache-first offline support for the app shell
-- [`icons/`](icons/) — generated app icons (regular + maskable, 16–512px) and `favicon.ico`
-- `index.html` — manifest link, theme-color, apple-touch-icon meta tags, and service worker registration
+- [`js/native-io.js`](js/native-io.js) — routes file-system calls through Tauri's native fs/dialog plugins instead of the browser's File System Access API (which blocks writing `.dll`/`.exe`)
+- [`icons/`](icons/) — generated app icons and `favicon.ico`
 - Draggable nodes/hub and a live pulse-tracking engine were added on top of the original demo.
 
 ## Running locally
 
-Any static file server works, e.g.:
+For a quick preview without building the Tauri app, any static file server works, e.g.:
 
 ```bash
 npx serve .
 ```
 
-Then open the printed `http://localhost` URL in a browser. Service workers require `http://localhost` or `https://` (not `file://`).
-
-## Installing as an app
-
-Once served over `http(s)`, use the browser's "Install app" / "Add to Home Screen" option to install Borg.Box as a standalone PWA.
+Real file-system access (installing mods) only works inside the actual Tauri app (`npm run dev` / `npm run build` in the parent folder) - a plain browser tab has no `window.__TAURI__` and falls back to the browser's own (write-restricted) File System Access API.
 
 ## Configuring the neural tree
 

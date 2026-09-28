@@ -6,7 +6,9 @@
 
 ## English
 
-**Borg.Box** is a mod manager for *Star Trek Fleet Command™*'s [BepInEx](https://github.com/BepInEx/BepInEx) modding ecosystem, presented as a Borg-themed neural tree interface. It runs either as an installable PWA or as a native Windows desktop app (this repository — a [Tauri](https://tauri.app/) wrapper around the same frontend).
+**Borg.Box** is a mod manager for *Star Trek Fleet Command™*'s [BepInEx](https://github.com/BepInEx/BepInEx) modding ecosystem, presented as a Borg-themed neural tree interface. It's a native Windows desktop app built with [Tauri](https://tauri.app/).
+
+![Borg.Box screenshot](screenshot.webp)
 
 ### What it does
 
@@ -16,7 +18,7 @@
 - Lets you add extra mod sources (a `catalog.json` URL or a local folder) alongside the default one — [stfc-mod-source](https://github.com/Plurimus/stfc-mod-source), a curated catalog of signed BepInEx mods for STFC.
 - Includes an in-app **assembly module** to build and sign your own `.mod` packages (manifest editor, DLL metadata reading, changelog/screenshots, key generation).
 - Full UI in 10 languages: English, Russian, German, Italian, French, Spanish, Portuguese, Korean, Chinese, Japanese.
-- The desktop build (this repo) writes files with native Rust I/O, so it isn't limited by the browser's File System Access API restrictions on installing `.dll`/`.exe` files that the PWA version runs into.
+- Writes files with native Rust I/O, so it isn't limited by the browser's File System Access API restrictions on installing `.dll`/`.exe` files (the reason this is a desktop app and not a plain web page).
 
 ### Download
 
@@ -35,7 +37,7 @@ npm run dev     # run in development mode
 npm run build   # produce release installers + portable exe
 ```
 
-The actual frontend (plain JS/SVG, no framework) lives in [`Borg.Box/`](Borg.Box/) — see [`Borg.Box/README.md`](Borg.Box/README.md) for how it's built on top of the [borg-html-sdk](https://github.com/JBlond/borg-html-sdk) (MIT-licensed) neural tree demo, and how to run it as a plain browser PWA instead of the desktop build. [`src-tauri/`](src-tauri/) is the native wrapper that gives the same frontend real filesystem access.
+The actual frontend (plain JS/SVG, no framework) lives in [`Borg.Box/`](Borg.Box/) — see [`Borg.Box/README.md`](Borg.Box/README.md) for how it's built on top of the [borg-html-sdk](https://github.com/JBlond/borg-html-sdk) (MIT-licensed) neural tree demo. [`src-tauri/`](src-tauri/) is the native wrapper that gives that frontend real filesystem access.
 
 ### Support
 
@@ -45,7 +47,9 @@ For STFC BepInEx items and Borg.Box support, please visit the [BORG Box](https:/
 
 ## Русский
 
-**Borg.Box** — менеджер модов для экосистемы [BepInEx](https://github.com/BepInEx/BepInEx) в *Star Trek Fleet Command™*, оформленный в виде борговского нейронного дерева. Работает как устанавливаемое PWA-приложение в браузере, так и как нативное десктопное приложение под Windows (этот репозиторий — обёртка на [Tauri](https://tauri.app/) поверх того же фронтенда).
+**Borg.Box** — менеджер модов для экосистемы [BepInEx](https://github.com/BepInEx/BepInEx) в *Star Trek Fleet Command™*, оформленный в виде борговского нейронного дерева. Нативное десктопное приложение под Windows на [Tauri](https://tauri.app/).
+
+![Скриншот Borg.Box](screenshot.webp)
 
 ### Что умеет
 
@@ -55,7 +59,7 @@ For STFC BepInEx items and Borg.Box support, please visit the [BORG Box](https:/
 - Позволяет добавлять дополнительные источники модов (ссылку на `catalog.json` или локальную папку) в дополнение к основному — [stfc-mod-source](https://github.com/Plurimus/stfc-mod-source), подобранному каталогу подписанных BepInEx-модов для STFC.
 - Включает встроенный **модуль сборки** для создания и подписи собственных `.mod`-пакетов (редактор манифеста, чтение метаданных из DLL, changelog/скриншоты, генерация ключей).
 - Полный интерфейс на 10 языках: русский, английский, немецкий, итальянский, французский, испанский, португальский, корейский, китайский, японский.
-- Десктопная сборка (этот репозиторий) записывает файлы через нативный Rust-код, поэтому не упирается в ограничение File System Access API браузера на установку `.dll`/`.exe` файлов, с которым сталкивается PWA-версия.
+- Записывает файлы через нативный Rust-код, поэтому не упирается в ограничение File System Access API браузера на установку `.dll`/`.exe` файлов (из-за этого ограничения приложение и сделано десктопным, а не веб-страницей).
 
 ### Скачать
 
@@ -74,7 +78,7 @@ npm run dev     # режим разработки
 npm run build   # сборка релизных установщиков + портативного exe
 ```
 
-Сам фронтенд (чистый JS/SVG, без фреймворков) лежит в [`Borg.Box/`](Borg.Box/) — см. [`Borg.Box/README.md`](Borg.Box/README.md) о том, как он построен поверх демо [borg-html-sdk](https://github.com/JBlond/borg-html-sdk) (лицензия MIT) и как запустить его как обычное PWA в браузере вместо десктопной сборки. [`src-tauri/`](src-tauri/) — нативная обёртка, дающая тому же фронтенду настоящий доступ к файловой системе.
+Сам фронтенд (чистый JS/SVG, без фреймворков) лежит в [`Borg.Box/`](Borg.Box/) — см. [`Borg.Box/README.md`](Borg.Box/README.md) о том, как он построен поверх демо [borg-html-sdk](https://github.com/JBlond/borg-html-sdk) (лицензия MIT). [`src-tauri/`](src-tauri/) — нативная обёртка, дающая тому же фронтенду настоящий доступ к файловой системе.
 
 ### Поддержка
 
