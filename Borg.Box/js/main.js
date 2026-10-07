@@ -11252,29 +11252,24 @@ async function checkAndDisplayDownloadedMod(node, ui) {
 		getModDlLogEntry(meta).validated = null;
 		return;
 	}
-	let modsHandle;
-	try { modsHandle = await resolveDefaultModsFolderHandle(); }
-	catch (_)
-	{
-		// Kein Client-Ordner konfiguriert - noch kein harter Fehler hier (das Panel kann trotzdem
-		// geoeffnet sein, bevor der Hub eingerichtet wurde). Trotzdem dieselbe Erreichbarkeits-
-		// Pruefung wie unten (Nutzerwunsch, siehe dort) - ein fehlender Client-Ordner darf eine hier
-		// bereits vom Start-Scan gesetzte rote Markierung nicht stillschweigend aufheben.
-		const reachable = await isModArchiveReachable(meta);
-		setModNodeValidationError(node, !reachable);
-		ui.setStatus(t(reachable ? 'modDownload.notDownloaded' : unreachableStatusKey(meta)), reachable ? null : 'bad');
-		ui.setDocs("", "");
-		ui.setDeleteEnabled(false);
-		getModDlLogEntry(meta).validated = null;
-		return;
-	}
+	// Nutzerbeobachtung: "BorgBox видит мод-пак в папке mods, отображает абсолютный путь до него, но
+	// пишет что мод еще не загружен" - hier stand bisher ein fruehes resolveDefaultModsFolderHandle()
+	// (GENAU EINE, frisch aus GAME_FOLDER_KEY berechnete "mods"-Quelle) - waehrend die informative
+	// Pfad-Anzeige weiter unten im Panel (findLocalModCopyLocation, siehe renderInstall) laengst ALLE
+	// konfigurierten lokalen Quellen durchsucht (listValidDirModSources). Ein Mod, der zwar in einer
+	// konfigurierten Quelle liegt, aber zufaellig nicht exakt der hier frisch berechneten entspricht,
+	// wurde darum als vorhanden ANGEZEIGT, aber nie gefunden/validiert - Installieren schlug trotzdem
+	// mit "keine Download-Quelle" fehl. Der eigentliche Dateisuch-Teil weiter unten nutzt jetzt
+	// dieselbe breite Suche wie findLocalModCopyLocation statt dieser einen fest verdrahteten Quelle -
+	// kein eigener "kein Client-Ordner"-Fruehausstieg mehr noetig, listValidDirModSources haengt gar
+	// nicht an GAME_FOLDER_KEY.
 	const fileName = modArchiveFileName(meta);
 	if (!fileName)
 	{
 		// Nutzerwunsch: "можно в catalog вообще не указывать никакой ссылки на скачивание? Ничего
 		// тогда не падает?" - leeres/fehlendes archive-Feld ist ein regulaerer Zustand (rein
 		// informativer Katalog-Eintrag), kein Name zum Nachschlagen vorhanden - direkt derselbe Weg
-		// wie unten bei NotFoundError, statt modsHandle.getFileHandle(null) zu riskieren.
+		// wie unten bei "nirgends gefunden", statt getFileHandle(null) zu riskieren.
 		const reachable = await isModArchiveReachable(meta);
 		setModNodeValidationError(node, !reachable);
 		ui.setStatus(t(reachable ? 'modDownload.notDownloaded' : unreachableStatusKey(meta)), reachable ? null : 'bad');
@@ -11283,43 +11278,37 @@ async function checkAndDisplayDownloadedMod(node, ui) {
 		getModDlLogEntry(meta).validated = null;
 		return;
 	}
-	let bytes;
+	let bytes = null;
 	try
 	{
-		const fileHandle = await modsHandle.getFileHandle(fileName);
-		bytes = new Uint8Array(await (await fileHandle.getFile()).arrayBuffer());
+		const dirSources = await listValidDirModSources();
+		for (const { handle } of dirSources)
+		{
+			try
+			{
+				const fileHandle = await handle.getFileHandle(fileName);
+				bytes = new Uint8Array(await (await fileHandle.getFile()).arrayBuffer());
+				break;
+			}
+			catch (_) { /* nicht in dieser Quelle - naechste pruefen */ }
+		}
 	}
-	catch (err)
+	catch (_) { /* listValidDirModSources selbst schlaegt nie hart fehl (siehe dort), rein informativ */ }
+	if (!bytes)
 	{
 		ui.setDocs("", "");
 		ui.setDeleteEnabled(false);
 		getModDlLogEntry(meta).validated = null;
-		// Nutzerwunsch: "проверь тайминги проверки" (nach einem gerade erfolgreichen Download stand
-		// hier trotzdem "Ещё не загружен") - vorher wurde JEDER Fehler hier, ohne Unterschied,
-		// stillschweigend als "nicht heruntergeladen" angezeigt (kein Log-Eintrag, keine Ursache
-		// sichtbar). NotFoundError (Datei existiert wirklich noch nicht) ist der einzige ERWARTETE
-		// Fall - jeder andere Fehler (Sperre, Berechtigung, I/O) wird jetzt als echter Fehler
-		// geloggt/angezeigt statt denselben irrefuehrenden "nicht heruntergeladen"-Text zu zeigen.
-		if (err.name === "NotFoundError")
-		{
-			// Nutzerwunsch: "подсвечивай сразу красным моды, которые нельзя скачать, но только если
-			// для них в локальном репозитории нет модпака" - NICHT blind auf den neutralen "noch
-			// nicht geladen"-Zustand zuruecksetzen: erst pruefen, ob das Archiv ueberhaupt jemals
-			// beschaffbar waere (isModArchiveReachable - dieselbe Pruefung wie der Start-Scan
-			// scanCatalogEntriesForDownloadability), sonst wuerde das blosse Oeffnen dieses Panels
-			// eine dort bereits gesetzte rote Markierung sofort wieder aufheben.
-			const reachable = await isModArchiveReachable(meta);
-			setModNodeValidationError(node, !reachable);
-			ui.setStatus(t(reachable ? 'modDownload.notDownloaded' : unreachableStatusKey(meta)), reachable ? null : 'bad');
-			if (!reachable) logAction("Checking downloaded archive: " + meta.modId + " v" + meta.version + " has no local copy and its archive is not reachable (" + describeArchiveSource(meta) + ").");
-		}
-		else
-		{
-			setModNodeValidationError(node, false);
-			const detail = formatErrorDetail(err);
-			ui.setStatus(t('modDownload.downloadFailedPrefix') + detail, 'bad');
-			logAction("Checking downloaded archive failed for " + meta.modId + " " + meta.version + " (reading \"" + fileName + "\" from default mods folder): " + detail);
-		}
+		// Nutzerwunsch: "подсвечивай сразу красным моды, которые нельзя скачать, но только если для
+		// них в локальном репозитории нет модпака" - NICHT blind auf den neutralen "noch nicht
+		// geladen"-Zustand zuruecksetzen: erst pruefen, ob das Archiv ueberhaupt jemals beschaffbar
+		// waere (isModArchiveReachable - dieselbe Pruefung wie der Start-Scan
+		// scanCatalogEntriesForDownloadability), sonst wuerde das blosse Oeffnen dieses Panels eine
+		// dort bereits gesetzte rote Markierung sofort wieder aufheben.
+		const reachable = await isModArchiveReachable(meta);
+		setModNodeValidationError(node, !reachable);
+		ui.setStatus(t(reachable ? 'modDownload.notDownloaded' : unreachableStatusKey(meta)), reachable ? null : 'bad');
+		if (!reachable) logAction("Checking downloaded archive: " + meta.modId + " v" + meta.version + " has no local copy in any configured source and its archive is not reachable (" + describeArchiveSource(meta) + ").");
 		return;
 	}
 	ui.setDeleteEnabled(true);
@@ -14897,7 +14886,10 @@ function extractSafeRawHtml(text) {
 	const tokens = [];
 	function stash(html) { tokens.push(html); return ` RAWHTML${tokens.length - 1} `; }
 	function attrOf(tag, name) {
-		const m = tag.match(new RegExp(name + '\\s*=\\s*"([^"]*)"', "i")) || tag.match(new RegExp(name + "\\s*=\\s*'([^']*)'", "i"));
+		// \b vor dem Namen - sonst wuerde z.B. attrOf(tag,"align") faelschlich innerhalb von
+		// valign="..." treffen ("align=" ist als reine Zeichenkette Teil von "valign="), was bei den
+		// Tabellen-Attributen unten (align UND valign beide erlaubt) sonst deren Werte vertauscht haette.
+		const m = tag.match(new RegExp("\\b" + name + '\\s*=\\s*"([^"]*)"', "i")) || tag.match(new RegExp("\\b" + name + "\\s*=\\s*'([^']*)'", "i"));
 		return m ? m[1] : "";
 	}
 	let prepared = String(text).replace(/<img\s+[^>]*>/gi, (tag) => {
@@ -14908,6 +14900,25 @@ function extractSafeRawHtml(text) {
 		return stash(`<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}"${title ? ` title="${escapeHtml(title)}"` : ""}>`);
 	});
 	prepared = prepared.replace(/<br\s*\/?>/gi, () => stash("<br>"));
+	// Nutzerbeobachtung: GitHub-READMEs bauen Screenshot-Galerien oft als rohe HTML-<table> statt
+	// GFM-Pipe-Syntax (siehe Hound-README) - renderMarkdownToHtml erkennt nur Pipe-Tabellen (siehe
+	// dort parseTableRow) als eigenen Block; eine mehrzeilige rohe <table> faellt stattdessen in den
+	// normalen Absatz-Pfad (closeParagraph) und wurde dort bisher komplett weggeskapiert ("<table>"
+	// als sichtbarer Text statt echter Tabelle). Dieselbe Whitelist-Technik wie bei <img> oben: nur
+	// die reinen Tabellen-Strukturtags + eine kleine sichere Attribut-Auswahl durchlassen, alles
+	// andere (Skripte, onclick, style) bleibt weggeschnitten. Ein <table> innerhalb des <p>, das
+	// closeParagraph() drumherum baut, ist kein Problem - Browser schliessen ein offenes <p> laut
+	// HTML5-Baumkonstruktion automatisch VOR einem <table>.
+	prepared = prepared.replace(/<(\/?)(table|thead|tbody|tfoot|tr|td|th)((?:\s+[^<>]*)?)>/gi, (full, closing, tagRaw) => {
+		const tag = tagRaw.toLowerCase();
+		if (closing) return stash(`</${tag}>`);
+		let attrs = "";
+		for (const name of ["width", "align", "valign", "colspan", "rowspan"]) {
+			const v = attrOf(full, name);
+			if (v) attrs += ` ${name}="${escapeHtml(v)}"`;
+		}
+		return stash(`<${tag}${attrs}>`);
+	});
 	prepared = prepared.replace(/<\/?p(?:\s[^>]*)?>/gi, "");
 	return { prepared, tokens };
 }
