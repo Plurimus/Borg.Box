@@ -14897,7 +14897,19 @@ function extractSafeRawHtml(text) {
 		if (!src || /^\s*javascript:/i.test(src)) return "";
 		const alt = attrOf(tag, "alt");
 		const title = attrOf(tag, "title");
-		return stash(`<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}"${title ? ` title="${escapeHtml(title)}"` : ""}>`);
+		// Nutzerbeobachtung: "иконка svg слишком большая для страница... линий вообще не видно" -
+		// width/height/align aus dem rohen <img>-Tag gingen hier bisher komplett verloren (nur src/
+		// alt/title durchgelassen) - ein README mit <img src="..." width="240"> (siehe Hound-README)
+		// rendert das Icon darum in seiner vollen intrinsischen SVG-Groesse (viewBox 1000x1000) statt
+		// der vom Autor vorgesehenen 240px, der sichtbare Ausschnitt zeigt dann nur noch eine
+		// flaechige Ecke der Zeichnung statt der ganzen Linienzeichnung. Dieselbe kleine
+		// Attribut-Whitelist wie bei den Tabellen-Tags unten.
+		let extraAttrs = "";
+		for (const name of ["width", "height", "align"]) {
+			const v = attrOf(tag, name);
+			if (v) extraAttrs += ` ${name}="${escapeHtml(v)}"`;
+		}
+		return stash(`<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}"${title ? ` title="${escapeHtml(title)}"` : ""}${extraAttrs}>`);
 	});
 	prepared = prepared.replace(/<br\s*\/?>/gi, () => stash("<br>"));
 	// Nutzerbeobachtung: GitHub-READMEs bauen Screenshot-Galerien oft als rohe HTML-<table> statt

@@ -1555,6 +1555,21 @@ input[type="file"].folder-name-input {
 }
 .md-content hr { border: none; border-top: 1px solid rgba(78, 255, 68, 0.3); margin: 1.5em 0; }
 .md-content img { max-width: 100%; border-radius: 6px; border: 1px solid rgba(78, 255, 68, 0.25); }
+/* Nutzerbeobachtung: "линии как полагаю - черные, а экран и фон тоже" - README-Logo-SVGs (anders als
+   echte PNG/JPG-Screenshots) sind so gut wie immer reine schwarze Linienzeichnungen, die einen
+   HELLEN Seitenhintergrund voraussetzen (GitHubs eigene README-Ansicht) - gegen --panel-bg
+   (rgba(8,15,8,0.95), praktisch schwarz) sind sie darum unsichtbar. Nur SVGs faerben (data:image/
+   svg+xml - main.js resolveLocalImagesInMarkdown baut lokal aufgeloeste Bilder genau so, siehe dort -
+   UND der rohe *.svg-Dateiname-Fall, falls die Aufloesung mal nicht greift), NIE echte Screenshots
+   (PNG/JPG), deren Farben eine Filterung zerstoeren wuerde.
+   Nutzerwunsch: "не белыми, а такого же цвета как и шрифт" - reines invert(1) ergab weiss; dieser
+   Filter trifft stattdessen #4eff44 (--borg-green) exakt (per echtem Canvas-Pixel-Abgleich im
+   Browser gefunden/verifiziert, nicht von Hand geschaetzt - Ausgangsfarbe der Icons ist immer reines
+   Schwarz, siehe z.B. Hound_icon.svg: fill="#000000" ueberall). CSS filter kann keine Variable
+   referenzieren, darum als feste Werte statt var(--borg-green). */
+.md-content img[src^="data:image/svg+xml"], .md-content img[src$=".svg"] {
+	filter: invert(93%) sepia(76%) saturate(984%) hue-rotate(48deg) brightness(108%) contrast(102%);
+}
 .md-content table { border-collapse: collapse; width: 100%; margin: 0.8em 0; font-size: 0.95em; }
 .md-content th, .md-content td { border: 1px solid rgba(78, 255, 68, 0.3); padding: 6px 10px; text-align: left; }
 .md-content th { background: rgba(78, 255, 68, 0.1); }
