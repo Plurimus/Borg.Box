@@ -1265,96 +1265,75 @@ function updateLayoutTransition(now) {
 	});
 }
 
-async function initInterface() {
-	// Nutzerwunsch: "английский - языком интерфейса по-умолчанию, а на старте убери флаг выбранного
-	// языка, чтобы при первом запуске появилось окно выбора языка" - kein LANG_SELECTED_KEY in
-	// localStorage (echter Erststart, oder Nutzerdaten geloescht) loest den Sprachauswahl-Bildschirm
-	// automatisch aus (siehe applyLanguage(cornerNodeLanguageCode) am Funktionsende), statt still auf
-	// Englisch zu bleiben.
-	let noLanguageChosenYet = false;
-	// Nutzerbeobachtung: "почему центральный хаб при загрузке главного экрана начинает с уголового
-	// режима? пусть начинает с цантрированного" - fruehendem lag das daran, dass der Hub erst NACH
-	// den Netzwerk-/Katalog-Awaits gebaut wurde (siehe applyLayoutMode('fit') am Funktionsende) und
-	// GENAU DORT unsichtbar (hinter dem noch blickdichten Boot-Overlay bzw. noch vor dem ersten
-	// Paint) von der Ecken- in die Fit-Position ueberging. Seit der Hub JETZT sofort (vor jedem
-	// Await) sichtbar wird (siehe Kommentar weiter unten), war dieser Uebergang zum ersten Mal
-	// SICHTBAR - der Hub erschien in der Ecke und "sprang" Sekunden spaeter ins Zentrum. Fix: schon
-	// hier direkt im Fit-Modus starten (kein Sprung mehr noetig) - layoutMode selbst wird ebenfalls
-	// schon hier auf 'fit' gesetzt, damit das applyLayoutMode('fit') am Funktionsende (dort bleibt es
-	// unveraendert stehen, fuer den Corner-Faceplate-Resize-Handler) ein No-Op ist statt einer
-	// zweiten, ueberfluessigen Uebergangsanimation.
-	layoutMode = 'fit';
-	// applyLayoutMode('fit') setzt normalerweise auch die aktive Optik des Umschalt-Knopfes - da der
-	// Aufruf am Funktionsende jetzt (layoutMode ist ja schon 'fit') ein No-Op ist, hier einmalig
-	// nachgeholt, sonst zeigte der Knopf faelschlich "Radial" an, obwohl tatsaechlich Fit aktiv ist.
-	const layoutToggleBtnEl = document.getElementById('layoutToggleBtn');
-	if (layoutToggleBtnEl) layoutToggleBtnEl.classList.add('active');
-	const anchor = computeFitAnchoredCenter();
-	config.center.x = anchor.x;
-	config.center.y = anchor.y;
-	// Branch-Laenge (Wurzel-Abstand + Kettenlaenge pro Glied) haengt prozentual von der echten
-	// Fensterbreite ab (siehe buildCatalogNodes in config.js) - darum erst hier, mit dem echten Hub
-	// UND der echten Fensterbreite, generieren statt schon beim Skript-Laden in config.js. Bleibt
-	// bewusst die VOLLE (nicht Fit-skalierte) Fensterbreite - config.nodes wird trotz Fit-Start unten
-	// weiterhin im vollen Radial-Massstab gebaut (siehe dortiger Kommentar), damit nodeBlueprint fuer
-	// einen spaeteren manuellen Wechsel zurueck in den Radial-Modus (Layout-Umschalter-Knopf) korrekte
-	// volle Referenzwerte behaelt.
-	radialVw = window.innerWidth || 1000;
+// Vollstaendiger Katalog, BEVOR der Kompakt-Filter Versionen rauswirft. Wird beim Umschalten
+// und nach Install/Uninstall neu in den Baum gelegt, ohne den Katalog noch einmal zu laden.
+let catalogGroupsFull = null;
+// Jeder Neuaufbau erhoeht das hier. Laufende Materialize-Animationen des vorigen Baums
+// brechen ab, sobald die Generation nicht mehr passt (dieselben Knoten-Ids wuerden sonst
+// vom alten Timer weiter verkleinert).
+let catalogTreeGeneration = 0;
 
-	// Nutzerbeobachtung: "при перезапуске или обновлении страницы... слишком долгая подгрузка... и
-	// всё виснет" - Hub/Sternenfeld/Radar-Pulse hingen bisher HINTER await ensureDefaultModSources/
-	// fetchAllCatalogEntries/scanLocalDirSourcesForStandaloneMods (Netzwerk-Fetch + ggf. langsamer
-	// lokaler Ordner-Scan) - bei langsamer Verbindung oder grossem lokalem Quellordner blieb der
-	// Bildschirm bis dahin BUCHSTAEBLICH leer (kein Hub, kein Sternenfeld), auch wenn skipBootAnim
-	// aktiv ist oder die feste Boot-Overlay-Dauer laenger als der eigentliche Ladevorgang braucht.
-	// Haengt NICHTS von config.nodes/dem Katalog ab (computeRadarMaxR/initRadarPulses/createFieldStars/
-	// createCoreIconGroup brauchen nur config.center + die Fensterbreite, beides schon oben gesetzt) -
-	// darum jetzt VOR jedem Await gezeichnet, damit der Hub sofort pulsiert, waehrend Katalog/lokale
-	// Quellen im Hintergrund laden.
-	radarMaxR = computeRadarMaxR();
-	initRadarPulses();
+// Kompakt-Ansicht: installierter Mod behaelt die installierte Version und alles Neuere.
+// Ein nicht installierter Mod behaelt nur die aktuelle (letzte) Stufe. Konfliktgeschwister
+// einer behaltenen Stufe bleiben zusammen. Ist die installierte Version gar nicht im Katalog,
+// bleibt wenigstens die letzte Stufe, damit die Branche nicht verschwindet.
+function filterCatalogGroupsForInstall(groups) {
+	if (!isCompactVersionTree() || !groups) return groups;
+	return groups.map((group) => {
+		const levels = group.versions || [];
+		if (!levels.length) return group;
+		const installed = getInstalledVersion(group.modId);
+		if (!installed) return Object.assign({}, group, { versions: levels.slice(-1) });
+		const kept = levels.filter((level) => compareModVersions(level[0].version, installed) >= 0);
+		if (!kept.length) return Object.assign({}, group, { versions: levels.slice(-1) });
+		return Object.assign({}, group, { versions: kept });
+	});
+}
+
+function clearCatalogTree() {
+	catalogTreeGeneration++;
+	hideHoverTooltip();
+	clearHighlightTimers();
+	activeBurstLoops.forEach((timeoutId) => clearTimeout(timeoutId));
+	activeBurstLoops.clear();
+	dragChain = null;
+	dragChainRestLen = null;
+	dragChainIndex = -1;
+	draggedNodeId = null;
+	draggingNodeIds = new Set();
+	nodeTransition.clear();
+	hubContactAngle.clear();
+	pendingDisconnectTimeouts.forEach((timeoutId) => clearTimeout(timeoutId));
+	pendingDisconnectTimeouts.clear();
+	config.nodes = [];
+	nodeCircles.forEach((el) => el.remove());
+	nodeCircles.clear();
+	nodePaths.forEach((el) => el.remove());
+	nodePaths.clear();
+	nodeConflictPaths.forEach((entry) => entry.path.remove());
+	nodeConflictPaths.clear();
+	nodeExtraForwardPaths.forEach((el) => el.remove());
+	nodeExtraForwardPaths.clear();
+	nodeIconEls.forEach((entry) => entry.el.remove());
+	nodeIconEls.clear();
+	document.querySelectorAll('#neuralNet defs mask[id^="dynIconMask_"]').forEach((el) => el.remove());
+	for (let i = activePulses.length - 1; i >= 0; i--) {
+		activePulses[i].el.remove();
+		activePulses.splice(i, 1);
+	}
+	nodeHoverState.clear();
+	nodeSpin.clear();
+	branchStates.clear();
+	if (nodeBlueprint) nodeBlueprint.clear();
+}
+
+// Baut Kreise, Pfade, Icons und den Fit-Massstab aus bereits gruppierten Katalogdaten.
+// animate=true nur beim allerersten Aufbau (Knoten wachsen nacheinander aus einem Punkt).
+// Ein Umbau wegen des Kompakt-Filters setzt die Kreise sofort auf ihre Zielgroesse.
+function mountCatalogTree(groups, animate) {
+	const generation = catalogTreeGeneration;
 	const nodesContainer = document.getElementById('nodesContainer');
-	nodesContainer.appendChild(createFieldStars());
-	const coreGroup = createSVGElement("g", {id: "coreGroup"});
-	coreIcon = createCoreIconGroup();
-	coreIcon.setAttribute('transform', `translate(${config.center.x},${config.center.y})`);
-	coreIcon.style.cursor = 'pointer';
-	coreIcon.addEventListener('mouseenter', () => { coreIcon.classList.add('core-icon-hot'); gearAttractTarget = 1; });
-	coreIcon.addEventListener('mouseleave', () => { coreIcon.classList.remove('core-icon-hot'); gearAttractTarget = 0; });
-	coreIcon.addEventListener('click', () => openPanel(config.center));
-	coreGroup.appendChild(coreIcon);
-	nodesContainer.appendChild(coreGroup);
-
-	// Nutzerwunsch: "моды должны автоматически подтягиваться с дефолтных источников и отображаться
-	// на главном экране до определения папки с клиентом игры" - ensureDefaultModSources trug die
-	// Standard-URL-Quelle ("Optimus mods") bisher NUR ein, wenn ein Client-Ordner erfolgreich
-	// gefunden wurde (siehe gameFolderPicker.resolve) - vor diesem Schritt war modSourcesMeta darum
-	// leer, fetchAllCatalogEntries direkt darunter hatte buchstaeblich nichts zum Laden, der Baum
-	// blieb bis zur Ordnerauswahl leer. Ohne gameParentHandle (hier: kein Client-Ordner-Handle
-	// vorhanden) ueberspringt die Funktion selbst nur den lokalen "mods"-Ordner-Zweig (der als
-	// GESCHWISTER des Client-Ordners sowieso erst DANN entstehen kann) - die URL-Quelle wird trotzdem
-	// sofort angelegt/migriert.
-	await ensureDefaultModSources(null);
-	// Baum kommt jetzt komplett aus dem echten Mod-Katalog (Nutzerwunsch: keine dekorativen
-	// Zufalls-Branches mehr) - eine Branche pro Mod-Id, ein Knoten pro Version. Ein Fetch-Fehler
-	// einzelner Quellen wird in fetchAllCatalogEntries selbst geloggt/uebersprungen, hier bleibt
-	// nur eine (ggf. leere) Liste uebrig.
-	const catalogEntries = await fetchAllCatalogEntries();
-	// Muss VOR dem Bauen der Knoten fertig sein (anders als die beiden fire-and-forget-Scans
-	// darunter) - liefert zusaetzliche, synthetische Katalog-Eintraege fuer lokal gefundene, aber in
-	// keinem catalog.json gelistete *.mod-Dateien (siehe Funktionskommentar), die buildCatalogNodes
-	// gleich mit-verarbeiten soll.
-	const standaloneEntries = await scanLocalDirSourcesForStandaloneMods(catalogEntries);
-	const catalogGroups = groupCatalogEntriesByMod(catalogEntries.concat(standaloneEntries));
-	config.nodes = buildCatalogNodes(config.center, radialVw, catalogGroups);
-	scanLocalModCacheForHashMismatches(catalogEntries); // fire-and-forget, rein informativ (siehe dort)
-	scanCatalogEntriesForDownloadability(catalogEntries); // fire-and-forget, siehe dort (Nutzerwunsch: nicht erreichbare Mods ohne lokale Kopie sofort rot)
-	// Nutzerbeobachtung: "после первого запуска... не проверяет какие моды уже установлены" - VOR der
-	// reinen Bereinigung/Verifikation unten (die nur bereits bekannte Eintraege prueft) erst nach
-	// bisher UNBEKANNTEN, aber tatsaechlich vorhandenen Installationen suchen (siehe dort).
-	discoverPreexistingModInstalls(catalogEntries); // fire-and-forget, siehe dort
-	reconcileInstalledModsWithClientFolder(); // fire-and-forget, bereinigt+reconciled (siehe dort)
-
+	config.nodes = buildCatalogNodes(config.center, radialVw, groups);
 	nodeBlueprint = new Map();
 	config.nodes.forEach(n => nodeBlueprint.set(n.id, {relX: n.x - config.center.x, relY: n.y - config.center.y}));
 	// config.nodes selbst kam von buildCatalogNodes im VOLLEN Radial-Massstab (siehe radialVw-
@@ -1364,11 +1343,16 @@ async function initInterface() {
 	// oben) - hier darum EINMALIG, direkt/ohne Animation (die Knoten sind ueber
 	// animateNodeMaterialize ohnehin noch unsichtbar/r=0, ein Positionssprung faellt also nicht auf),
 	// derselbe k-Faktor wie applyLayoutMode('fit') angewandt.
-	const fitK = computeFitEffectiveVw() / radialVw;
-	config.nodes.forEach(n => {
-		const bp = nodeBlueprint.get(n.id);
-		if (bp) { n.x = config.center.x + bp.relX * fitK; n.y = config.center.y + bp.relY * fitK; }
-	});
+	// Radial laesst die Knoten auf dem vollen Blueprint. Fit staucht sie wie beim ersten Aufbau.
+	// Ohne diese Weiche wuerde ein Umbau im Radial-Modus die Kette wieder in die Fit-Mitte ziehen.
+	if (layoutMode === 'fit')
+	{
+		const fitK = computeFitEffectiveVw() / radialVw;
+		config.nodes.forEach(n => {
+			const bp = nodeBlueprint.get(n.id);
+			if (bp) { n.x = config.center.x + bp.relX * fitK; n.y = config.center.y + bp.relY * fitK; }
+		});
+	}
 
 	// 4. Paths & Pulse - ein Wurzelknoten (eine Mod-Branche) bekommt seine Verbindung zum Hub
 	// NUR, wenn mindestens eine Version dieses Mods bereits installiert ist (Nutzerwunsch: Kreise
@@ -1581,6 +1565,139 @@ async function initInterface() {
 		nodesContainer.appendChild(circle);
 	});
 
+	// Icon-Overlay pro Branche (Mod-Id) - siehe buildBranchIconOverlay weiter unten (top-level, damit
+	// reconcileBranchTipForModId dieselbe Funktion nach einer Installation/Deinstallation erneut
+	// aufrufen kann, wenn sich der Tip-Knoten der Branche aendert).
+	config.nodes.filter(n => !n.parentId && n.modMeta).forEach(buildBranchIconOverlay);
+	// Groesse/Farbe jeder Branche an den GERADE JETZT bekannten Installationsstand angleichen (siehe
+	// reconcileBranchTipForModId) - bei jedem Laden neu, nicht nur direkt nach einer Install-Aktion,
+	// damit ein Reload denselben Zustand zeigt (Nutzerwunsch: "крупным кружком показывать ...
+	// установленную версию" gilt dauerhaft, nicht nur unmittelbar nach dem Klick).
+	Array.from(new Set(config.nodes.filter(n => n.modMeta).map(n => n.modMeta.modId))).forEach(reconcileBranchTipForModId);
+	// Nutzerwunsch: "кружки модов отрисовывать сразу с центрального и остальные - по порядку
+	// обнаружения (уже есть эффект появления\исчезновения из\в точки)" - alle Mod-Knoten kamen bisher
+	// gleichzeitig, ohne jede Animation, auf voller Groesse zur Welt (der Hub selbst erscheint dank
+	// der Umstellung weiter oben in dieser Funktion bereits sofort). Jetzt: Ziel-Radius merken, auf 0
+	// zuruecksetzen, dann nacheinander (Reihenfolge = config.nodes, also die Katalog-/Entdeckungs-
+	// Reihenfolge aus buildCatalogNodes) mit animateNodeMaterialize aus einem Punkt herauswachsen
+	// lassen - dieselbe Optik/Mechanik wie animateNodeVanish, nur umgekehrt.
+	config.nodes.filter(n => n.modMeta).forEach((node, i) => {
+		if (!animate) return;
+		const targetR = node.r;
+		const st = nodeHoverState.get(node.id);
+		node.r = 0;
+		if (st) { st.baseR = 0; st.t = 0; st.target = 0; }
+		setTimeout(() => {
+			if (generation !== catalogTreeGeneration) return;
+			animateNodeMaterialize(node.id, targetR, generation);
+		}, i * NODE_MATERIALIZE_STAGGER_MS);
+	});
+}
+
+function rebuildCatalogTree() {
+	if (!catalogGroupsFull) return;
+	clearCatalogTree();
+	mountCatalogTree(filterCatalogGroupsForInstall(catalogGroupsFull), false);
+}
+
+// Nur wenn der Kompakt-Filter an ist: der Schnitt "aelter als installiert" wandert bei
+// Install/Uninstall/Entdeckung, also muss die Kette neu gelegt werden. Ausgeschaltet bleibt
+// der bisherige Tip-/Farb-Abgleich der schon stehenden Knoten.
+function refreshCompactTree() {
+	if (!isCompactVersionTree()) return;
+	rebuildCatalogTree();
+}
+
+async function initInterface() {
+	// Nutzerwunsch: "английский - языком интерфейса по-умолчанию, а на старте убери флаг выбранного
+	// языка, чтобы при первом запуске появилось окно выбора языка" - kein LANG_SELECTED_KEY in
+	// localStorage (echter Erststart, oder Nutzerdaten geloescht) loest den Sprachauswahl-Bildschirm
+	// automatisch aus (siehe applyLanguage(cornerNodeLanguageCode) am Funktionsende), statt still auf
+	// Englisch zu bleiben.
+	let noLanguageChosenYet = false;
+	// Nutzerbeobachtung: "почему центральный хаб при загрузке главного экрана начинает с уголового
+	// режима? пусть начинает с цантрированного" - fruehendem lag das daran, dass der Hub erst NACH
+	// den Netzwerk-/Katalog-Awaits gebaut wurde (siehe applyLayoutMode('fit') am Funktionsende) und
+	// GENAU DORT unsichtbar (hinter dem noch blickdichten Boot-Overlay bzw. noch vor dem ersten
+	// Paint) von der Ecken- in die Fit-Position ueberging. Seit der Hub JETZT sofort (vor jedem
+	// Await) sichtbar wird (siehe Kommentar weiter unten), war dieser Uebergang zum ersten Mal
+	// SICHTBAR - der Hub erschien in der Ecke und "sprang" Sekunden spaeter ins Zentrum. Fix: schon
+	// hier direkt im Fit-Modus starten (kein Sprung mehr noetig) - layoutMode selbst wird ebenfalls
+	// schon hier auf 'fit' gesetzt, damit das applyLayoutMode('fit') am Funktionsende (dort bleibt es
+	// unveraendert stehen, fuer den Corner-Faceplate-Resize-Handler) ein No-Op ist statt einer
+	// zweiten, ueberfluessigen Uebergangsanimation.
+	layoutMode = 'fit';
+	// applyLayoutMode('fit') setzt normalerweise auch die aktive Optik des Umschalt-Knopfes - da der
+	// Aufruf am Funktionsende jetzt (layoutMode ist ja schon 'fit') ein No-Op ist, hier einmalig
+	// nachgeholt, sonst zeigte der Knopf faelschlich "Radial" an, obwohl tatsaechlich Fit aktiv ist.
+	const layoutToggleBtnEl = document.getElementById('layoutToggleBtn');
+	if (layoutToggleBtnEl) layoutToggleBtnEl.classList.add('active');
+	const anchor = computeFitAnchoredCenter();
+	config.center.x = anchor.x;
+	config.center.y = anchor.y;
+	// Branch-Laenge (Wurzel-Abstand + Kettenlaenge pro Glied) haengt prozentual von der echten
+	// Fensterbreite ab (siehe buildCatalogNodes in config.js) - darum erst hier, mit dem echten Hub
+	// UND der echten Fensterbreite, generieren statt schon beim Skript-Laden in config.js. Bleibt
+	// bewusst die VOLLE (nicht Fit-skalierte) Fensterbreite - config.nodes wird trotz Fit-Start unten
+	// weiterhin im vollen Radial-Massstab gebaut (siehe dortiger Kommentar), damit nodeBlueprint fuer
+	// einen spaeteren manuellen Wechsel zurueck in den Radial-Modus (Layout-Umschalter-Knopf) korrekte
+	// volle Referenzwerte behaelt.
+	radialVw = window.innerWidth || 1000;
+
+	// Nutzerbeobachtung: "при перезапуске или обновлении страницы... слишком долгая подгрузка... и
+	// всё виснет" - Hub/Sternenfeld/Radar-Pulse hingen bisher HINTER await ensureDefaultModSources/
+	// fetchAllCatalogEntries/scanLocalDirSourcesForStandaloneMods (Netzwerk-Fetch + ggf. langsamer
+	// lokaler Ordner-Scan) - bei langsamer Verbindung oder grossem lokalem Quellordner blieb der
+	// Bildschirm bis dahin BUCHSTAEBLICH leer (kein Hub, kein Sternenfeld), auch wenn skipBootAnim
+	// aktiv ist oder die feste Boot-Overlay-Dauer laenger als der eigentliche Ladevorgang braucht.
+	// Haengt NICHTS von config.nodes/dem Katalog ab (computeRadarMaxR/initRadarPulses/createFieldStars/
+	// createCoreIconGroup brauchen nur config.center + die Fensterbreite, beides schon oben gesetzt) -
+	// darum jetzt VOR jedem Await gezeichnet, damit der Hub sofort pulsiert, waehrend Katalog/lokale
+	// Quellen im Hintergrund laden.
+	radarMaxR = computeRadarMaxR();
+	initRadarPulses();
+	const nodesContainer = document.getElementById('nodesContainer');
+	nodesContainer.appendChild(createFieldStars());
+	const coreGroup = createSVGElement("g", {id: "coreGroup"});
+	coreIcon = createCoreIconGroup();
+	coreIcon.setAttribute('transform', `translate(${config.center.x},${config.center.y})`);
+	coreIcon.style.cursor = 'pointer';
+	coreIcon.addEventListener('mouseenter', () => { coreIcon.classList.add('core-icon-hot'); gearAttractTarget = 1; });
+	coreIcon.addEventListener('mouseleave', () => { coreIcon.classList.remove('core-icon-hot'); gearAttractTarget = 0; });
+	coreIcon.addEventListener('click', () => openPanel(config.center));
+	coreGroup.appendChild(coreIcon);
+	nodesContainer.appendChild(coreGroup);
+
+	// Nutzerwunsch: "моды должны автоматически подтягиваться с дефолтных источников и отображаться
+	// на главном экране до определения папки с клиентом игры" - ensureDefaultModSources trug die
+	// Standard-URL-Quelle ("Optimus mods") bisher NUR ein, wenn ein Client-Ordner erfolgreich
+	// gefunden wurde (siehe gameFolderPicker.resolve) - vor diesem Schritt war modSourcesMeta darum
+	// leer, fetchAllCatalogEntries direkt darunter hatte buchstaeblich nichts zum Laden, der Baum
+	// blieb bis zur Ordnerauswahl leer. Ohne gameParentHandle (hier: kein Client-Ordner-Handle
+	// vorhanden) ueberspringt die Funktion selbst nur den lokalen "mods"-Ordner-Zweig (der als
+	// GESCHWISTER des Client-Ordners sowieso erst DANN entstehen kann) - die URL-Quelle wird trotzdem
+	// sofort angelegt/migriert.
+	await ensureDefaultModSources(null);
+	// Baum kommt jetzt komplett aus dem echten Mod-Katalog (Nutzerwunsch: keine dekorativen
+	// Zufalls-Branches mehr) - eine Branche pro Mod-Id, ein Knoten pro Version. Ein Fetch-Fehler
+	// einzelner Quellen wird in fetchAllCatalogEntries selbst geloggt/uebersprungen, hier bleibt
+	// nur eine (ggf. leere) Liste uebrig.
+	const catalogEntries = await fetchAllCatalogEntries();
+	// Muss VOR dem Bauen der Knoten fertig sein (anders als die beiden fire-and-forget-Scans
+	// darunter) - liefert zusaetzliche, synthetische Katalog-Eintraege fuer lokal gefundene, aber in
+	// keinem catalog.json gelistete *.mod-Dateien (siehe Funktionskommentar), die buildCatalogNodes
+	// gleich mit-verarbeiten soll.
+	const standaloneEntries = await scanLocalDirSourcesForStandaloneMods(catalogEntries);
+	catalogGroupsFull = groupCatalogEntriesByMod(catalogEntries.concat(standaloneEntries));
+	scanLocalModCacheForHashMismatches(catalogEntries); // fire-and-forget, rein informativ (siehe dort)
+	scanCatalogEntriesForDownloadability(catalogEntries); // fire-and-forget, siehe dort (Nutzerwunsch: nicht erreichbare Mods ohne lokale Kopie sofort rot)
+	// Nutzerbeobachtung: "после первого запуска... не проверяет какие моды уже установлены" - VOR der
+	// reinen Bereinigung/Verifikation unten (die nur bereits bekannte Eintraege prueft) erst nach
+	// bisher UNBEKANNTEN, aber tatsaechlich vorhandenen Installationen suchen (siehe dort).
+	discoverPreexistingModInstalls(catalogEntries); // fire-and-forget, siehe dort
+	reconcileInstalledModsWithClientFolder(); // fire-and-forget, bereinigt+reconciled (siehe dort)
+	mountCatalogTree(filterCatalogGroupsForInstall(catalogGroupsFull), true);
+
 	// Eigenstaendiger Ecken-Knoten unten rechts (siehe Deklaration/Kommentar oben) - nur einmal
 	// erzeugt, Position/Wackeln danach jeden Frame in tickInteraction nachgefuehrt.
 	cornerNodeAnchor = computeCornerNodeAnchor();
@@ -1729,29 +1846,7 @@ async function initInterface() {
 		nodesContainer.appendChild(ticketIconEl);
 	}
 
-	// Icon-Overlay pro Branche (Mod-Id) - siehe buildBranchIconOverlay weiter unten (top-level, damit
-	// reconcileBranchTipForModId dieselbe Funktion nach einer Installation/Deinstallation erneut
-	// aufrufen kann, wenn sich der Tip-Knoten der Branche aendert).
-	config.nodes.filter(n => !n.parentId && n.modMeta).forEach(buildBranchIconOverlay);
-	// Groesse/Farbe jeder Branche an den GERADE JETZT bekannten Installationsstand angleichen (siehe
-	// reconcileBranchTipForModId) - bei jedem Laden neu, nicht nur direkt nach einer Install-Aktion,
-	// damit ein Reload denselben Zustand zeigt (Nutzerwunsch: "крупным кружком показывать ...
-	// установленную версию" gilt dauerhaft, nicht nur unmittelbar nach dem Klick).
-	Array.from(new Set(config.nodes.filter(n => n.modMeta).map(n => n.modMeta.modId))).forEach(reconcileBranchTipForModId);
-	// Nutzerwunsch: "кружки модов отрисовывать сразу с центрального и остальные - по порядку
-	// обнаружения (уже есть эффект появления\исчезновения из\в точки)" - alle Mod-Knoten kamen bisher
-	// gleichzeitig, ohne jede Animation, auf voller Groesse zur Welt (der Hub selbst erscheint dank
-	// der Umstellung weiter oben in dieser Funktion bereits sofort). Jetzt: Ziel-Radius merken, auf 0
-	// zuruecksetzen, dann nacheinander (Reihenfolge = config.nodes, also die Katalog-/Entdeckungs-
-	// Reihenfolge aus buildCatalogNodes) mit animateNodeMaterialize aus einem Punkt herauswachsen
-	// lassen - dieselbe Optik/Mechanik wie animateNodeVanish, nur umgekehrt.
-	config.nodes.filter(n => n.modMeta).forEach((node, i) => {
-		const targetR = node.r;
-		const st = nodeHoverState.get(node.id);
-		node.r = 0;
-		if (st) { st.baseR = 0; st.t = 0; st.target = 0; }
-		setTimeout(() => animateNodeMaterialize(node.id, targetR), i * NODE_MATERIALIZE_STAGGER_MS);
-	});
+
 	// Zentrum, Ikone und alle Root-Pfade an eine neue Position bringen - genutzt vom
 	// Resize-Handler (Ecken-Andockung). Der Hub selbst ist nicht mehr draggable (fixiert),
 	// darum gibt es hier keinen Drag-Handler mehr. Die Radar-Pulse lesen config.center bei
@@ -3227,6 +3322,16 @@ function applyLangNodeVisibility() {
 	if (cornerNodePath) cornerNodePath.style.display = display;
 }
 
+// Kompakt-Baum: aeltere Versionen als die installierte weg, bei nicht installierten Mods nur
+// die aktuelle Stufe. Aus ist der volle Versionsstrang. Default aus.
+const COMPACT_VERSION_TREE_KEY = "borg-box-compact-version-tree";
+function isCompactVersionTree() {
+	try { return localStorage.getItem(COMPACT_VERSION_TREE_KEY) === "1"; } catch (_) { return false; }
+}
+function setCompactVersionTree(on) {
+	try { localStorage.setItem(COMPACT_VERSION_TREE_KEY, on ? "1" : "0"); } catch (_) {}
+}
+
 // ============================================================================
 // I18N_PACKS - vorbereitete Uebersetzungen fuer 10 Sprachen (ru/en/de/it/fr/es/pt/ko/zh/ja).
 // WICHTIG: Dies ist noch KEIN aktiv verdrahtetes i18n-System - es gibt (noch) keinen
@@ -3579,6 +3684,8 @@ const I18N_PACKS = {
 		skipBootAnim: "Без анимации загрузки (при следующем запуске)",
 		hideAssemblyNode: "Скрыть модуль сборки",
 		hideLangNode: "Скрыть узел выбора языка",
+		compactVersions: "Скрыть старые версии модов",
+		compactVersionsHint: "У установленного мода остаются его версия и всё новее. У неустановленного — только текущая.",
 		assemblyNodeTitle: "Модуль сборки",
 		assemblyNodeText: "Упаковка и сборка модов - функция в разработке.",
 		lnkLauncher: {
@@ -3627,6 +3734,8 @@ const I18N_PACKS = {
 			glyphAnimSkipOff: "Пропуск анимации текста: выключен.",
 			bootAnimSkipOn: "Пропуск анимации загрузки: включен.",
 			bootAnimSkipOff: "Пропуск анимации загрузки: выключен.",
+			compactVersionsOn: "Скрытие старых версий: включено.",
+			compactVersionsOff: "Скрытие старых версий: выключено.",
 			lnkCommandCopied: "Скопирована команда запуска клиента.",
 			lnkBatDownloaded: "Скачан .bat файл запуска клиента.",
 			modSourceRemoved: (label) => `Удалён источник модов: ${label}.`,
@@ -3971,6 +4080,8 @@ const I18N_PACKS = {
 		skipBootAnim: "Skip the boot animation (on next launch)",
 		hideAssemblyNode: "Hide the assembly module",
 		hideLangNode: "Hide the language-selector node",
+		compactVersions: "Hide old mod versions",
+		compactVersionsHint: "An installed mod keeps its version and anything newer. A mod that is not installed keeps only its current version.",
 		assemblyNodeTitle: "Assembly Module",
 		assemblyNodeText: "Mod packaging and building - feature in development.",
 		lnkLauncher: {
@@ -4019,6 +4130,8 @@ const I18N_PACKS = {
 			glyphAnimSkipOff: "Skip text animation: off.",
 			bootAnimSkipOn: "Skip boot animation: on.",
 			bootAnimSkipOff: "Skip boot animation: off.",
+			compactVersionsOn: "Hiding old versions: on.",
+			compactVersionsOff: "Hiding old versions: off.",
 			lnkCommandCopied: "Copied client launch command.",
 			lnkBatDownloaded: "Downloaded client launch .bat file.",
 			modSourceRemoved: (label) => `Removed mod source: ${label}.`,
@@ -4239,6 +4352,8 @@ const I18N_PACKS = {
 		skipBootAnim: "Ladeanimation überspringen (beim nächsten Start)",
 		hideAssemblyNode: "Baumodul ausblenden",
 		hideLangNode: "Sprachauswahl-Knoten ausblenden",
+		compactVersions: "Alte Mod-Versionen ausblenden",
+		compactVersionsHint: "Ein installierter Mod behält seine Version und alles Neuere. Ein nicht installierter Mod behält nur die aktuelle Version.",
 		assemblyNodeTitle: "Baumodul",
 		assemblyNodeText: "Mod-Verpackung und -Erstellung - Funktion in Entwicklung.",
 		lnkLauncher: {
@@ -4287,6 +4402,8 @@ const I18N_PACKS = {
 			glyphAnimSkipOff: "Textanimation überspringen: aus.",
 			bootAnimSkipOn: "Ladeanimation überspringen: an.",
 			bootAnimSkipOff: "Ladeanimation überspringen: aus.",
+			compactVersionsOn: "Alte Versionen ausblenden: an.",
+			compactVersionsOff: "Alte Versionen ausblenden: aus.",
 			lnkCommandCopied: "Startbefehl für den Client kopiert.",
 			lnkBatDownloaded: ".bat-Datei zum Client-Start heruntergeladen.",
 			modSourceRemoved: (label) => `Mod-Quelle entfernt: ${label}.`,
@@ -4580,6 +4697,8 @@ const I18N_PACKS = {
 		skipBootAnim: "Salta l'animazione di avvio (al prossimo avvio)",
 		hideAssemblyNode: "Nascondi il modulo di assemblaggio",
 		hideLangNode: "Nascondi il nodo di selezione lingua",
+		compactVersions: "Nascondi le versioni vecchie delle mod",
+		compactVersionsHint: "Una mod installata tiene la sua versione e quelle più nuove. Una mod non installata tiene solo la versione attuale.",
 		assemblyNodeTitle: "Modulo di assemblaggio",
 		assemblyNodeText: "Creazione e pacchettizzazione delle mod - funzione in sviluppo.",
 		lnkLauncher: {
@@ -4628,6 +4747,8 @@ const I18N_PACKS = {
 			glyphAnimSkipOff: "Salta animazione testo: disattivo.",
 			bootAnimSkipOn: "Salta animazione di avvio: attivo.",
 			bootAnimSkipOff: "Salta animazione di avvio: disattivo.",
+			compactVersionsOn: "Nascondi versioni vecchie: attivo.",
+			compactVersionsOff: "Nascondi versioni vecchie: disattivo.",
 			lnkCommandCopied: "Comando di avvio del client copiato.",
 			lnkBatDownloaded: "File .bat di avvio del client scaricato.",
 			modSourceRemoved: (label) => `Fonte mod rimossa: ${label}.`,
@@ -4921,6 +5042,8 @@ const I18N_PACKS = {
 		skipBootAnim: "Ignorer l'animation de démarrage (au prochain lancement)",
 		hideAssemblyNode: "Masquer le module d'assemblage",
 		hideLangNode: "Masquer le nœud de sélection de langue",
+		compactVersions: "Masquer les anciennes versions de mods",
+		compactVersionsHint: "Un mod installé garde sa version et tout ce qui est plus récent. Un mod non installé ne garde que la version actuelle.",
 		assemblyNodeTitle: "Module d'assemblage",
 		assemblyNodeText: "Empaquetage et création de mods - fonctionnalité en développement.",
 		lnkLauncher: {
@@ -4969,6 +5092,8 @@ const I18N_PACKS = {
 			glyphAnimSkipOff: "Ignorer l'animation du texte : désactivé.",
 			bootAnimSkipOn: "Ignorer l'animation de démarrage : activé.",
 			bootAnimSkipOff: "Ignorer l'animation de démarrage : désactivé.",
+			compactVersionsOn: "Masquer les anciennes versions : activé.",
+			compactVersionsOff: "Masquer les anciennes versions : désactivé.",
 			lnkCommandCopied: "Commande de lancement du client copiée.",
 			lnkBatDownloaded: "Fichier .bat de lancement du client téléchargé.",
 			modSourceRemoved: (label) => `Source de mods supprimée : ${label}.`,
@@ -5262,6 +5387,8 @@ const I18N_PACKS = {
 		skipBootAnim: "Omitir la animación de inicio (en el próximo inicio)",
 		hideAssemblyNode: "Ocultar el módulo de ensamblaje",
 		hideLangNode: "Ocultar el nodo de selección de idioma",
+		compactVersions: "Ocultar versiones antiguas de mods",
+		compactVersionsHint: "Un mod instalado conserva su versión y todo lo más nuevo. Un mod no instalado conserva solo la versión actual.",
 		assemblyNodeTitle: "Módulo de ensamblaje",
 		assemblyNodeText: "Empaquetado y creación de mods - función en desarrollo.",
 		lnkLauncher: {
@@ -5310,6 +5437,8 @@ const I18N_PACKS = {
 			glyphAnimSkipOff: "Omitir animación de texto: desactivado.",
 			bootAnimSkipOn: "Omitir animación de inicio: activado.",
 			bootAnimSkipOff: "Omitir animación de inicio: desactivado.",
+			compactVersionsOn: "Ocultar versiones antiguas: activado.",
+			compactVersionsOff: "Ocultar versiones antiguas: desactivado.",
 			lnkCommandCopied: "Comando de inicio del cliente copiado.",
 			lnkBatDownloaded: "Archivo .bat de inicio del cliente descargado.",
 			modSourceRemoved: (label) => `Fuente de mods eliminada: ${label}.`,
@@ -5603,6 +5732,8 @@ const I18N_PACKS = {
 		skipBootAnim: "Pular a animação de inicialização (na próxima execução)",
 		hideAssemblyNode: "Ocultar o módulo de montagem",
 		hideLangNode: "Ocultar o nó de seleção de idioma",
+		compactVersions: "Ocultar versões antigas de mods",
+		compactVersionsHint: "Um mod instalado mantém a sua versão e tudo o que for mais novo. Um mod não instalado mantém só a versão atual.",
 		assemblyNodeTitle: "Módulo de montagem",
 		assemblyNodeText: "Empacotamento e criação de mods - recurso em desenvolvimento.",
 		lnkLauncher: {
@@ -5651,6 +5782,8 @@ const I18N_PACKS = {
 			glyphAnimSkipOff: "Pular animação de texto: desativado.",
 			bootAnimSkipOn: "Pular animação de inicialização: ativado.",
 			bootAnimSkipOff: "Pular animação de inicialização: desativado.",
+			compactVersionsOn: "Ocultar versões antigas: ativado.",
+			compactVersionsOff: "Ocultar versões antigas: desativado.",
 			lnkCommandCopied: "Comando de inicialização do cliente copiado.",
 			lnkBatDownloaded: "Arquivo .bat de inicialização do cliente baixado.",
 			modSourceRemoved: (label) => `Fonte de mods removida: ${label}.`,
@@ -5944,6 +6077,8 @@ const I18N_PACKS = {
 		skipBootAnim: "부팅 애니메이션 건너뛰기 (다음 실행 시)",
 		hideAssemblyNode: "조립 모듈 숨기기",
 		hideLangNode: "언어 선택 노드 숨기기",
+		compactVersions: "오래된 모드 버전 숨기기",
+		compactVersionsHint: "설치된 모드는 그 버전과 더 새로운 버전만 남습니다. 설치되지 않은 모드는 현재 버전만 남습니다.",
 		assemblyNodeTitle: "조립 모듈",
 		assemblyNodeText: "Mod 패키징 및 빌드 - 개발 중인 기능입니다.",
 		lnkLauncher: {
@@ -5992,6 +6127,8 @@ const I18N_PACKS = {
 			glyphAnimSkipOff: "텍스트 애니메이션 건너뛰기: 꺼짐.",
 			bootAnimSkipOn: "부팅 애니메이션 건너뛰기: 켜짐.",
 			bootAnimSkipOff: "부팅 애니메이션 건너뛰기: 꺼짐.",
+			compactVersionsOn: "오래된 버전 숨기기: 켜짐.",
+			compactVersionsOff: "오래된 버전 숨기기: 꺼짐.",
 			lnkCommandCopied: "클라이언트 실행 명령이 복사되었습니다.",
 			lnkBatDownloaded: "클라이언트 실행 .bat 파일이 다운로드되었습니다.",
 			modSourceRemoved: (label) => `모드 소스 삭제됨: ${label}.`,
@@ -6285,6 +6422,8 @@ const I18N_PACKS = {
 		skipBootAnim: "跳过启动动画（下次启动时）",
 		hideAssemblyNode: "隐藏组装模块",
 		hideLangNode: "隐藏语言选择节点",
+		compactVersions: "隐藏旧的模组版本",
+		compactVersionsHint: "已安装的模组保留其版本和更新的版本。未安装的模组只保留当前版本。",
 		assemblyNodeTitle: "组装模块",
 		assemblyNodeText: "Mod 打包与构建 - 开发中的功能。",
 		lnkLauncher: {
@@ -6333,6 +6472,8 @@ const I18N_PACKS = {
 			glyphAnimSkipOff: "跳过文字动画：关闭。",
 			bootAnimSkipOn: "跳过启动动画：开启。",
 			bootAnimSkipOff: "跳过启动动画：关闭。",
+			compactVersionsOn: "隐藏旧版本：开启。",
+			compactVersionsOff: "隐藏旧版本：关闭。",
 			lnkCommandCopied: "已复制客户端启动命令。",
 			lnkBatDownloaded: "已下载客户端启动 .bat 文件。",
 			modSourceRemoved: (label) => `已删除模组来源：${label}。`,
@@ -6626,6 +6767,8 @@ const I18N_PACKS = {
 		skipBootAnim: "起動アニメーションをスキップ(次回起動時)",
 		hideAssemblyNode: "組み立てモジュールを非表示",
 		hideLangNode: "言語選択ノードを非表示",
+		compactVersions: "古いMod版を隠す",
+		compactVersionsHint: "インストール済みのModは、その版とそれより新しい版だけを残します。未インストールのModは現在の版だけを残します。",
 		assemblyNodeTitle: "組み立てモジュール",
 		assemblyNodeText: "Modのパッケージ化とビルド - 開発中の機能です。",
 		lnkLauncher: {
@@ -6674,6 +6817,8 @@ const I18N_PACKS = {
 			glyphAnimSkipOff: "文字アニメーションをスキップ：オフ。",
 			bootAnimSkipOn: "起動アニメーションをスキップ：オン。",
 			bootAnimSkipOff: "起動アニメーションをスキップ：オフ。",
+			compactVersionsOn: "古い版を隠す：オン。",
+			compactVersionsOff: "古い版を隠す：オフ。",
 			lnkCommandCopied: "クライアント起動コマンドをコピーしました。",
 			lnkBatDownloaded: "クライアント起動用 .bat ファイルをダウンロードしました。",
 			modSourceRemoved: (label) => `Modソースを削除しました：${label}。`,
@@ -8345,6 +8490,28 @@ function initHideLangNodeToggle(container) {
 	});
 }
 
+// Kompakt-Filter fuer den Versionsbaum. Wirkt sofort: der Katalog bleibt im Speicher, nur die
+// sichtbaren Stufen werden neu gelegt (siehe rebuildCatalogTree).
+function initCompactVersionsToggle(container) {
+	container.innerHTML =
+		'<div class="folder-picker">' +
+			'<label class="borg-checkbox-row">' +
+				'<input type="checkbox" id="compactVersionsCheckbox">' +
+				'<span id="compactVersionsLabel"></span>' +
+			'</label>' +
+			'<div class="folder-picker-hint" id="compactVersionsHint"></div>' +
+		'</div>';
+	revealElementText(document.getElementById("compactVersionsLabel"), t("compactVersions"), 450);
+	revealElementText(document.getElementById("compactVersionsHint"), t("compactVersionsHint"), 550);
+	const checkbox = document.getElementById("compactVersionsCheckbox");
+	checkbox.checked = isCompactVersionTree();
+	checkbox.addEventListener("change", () => {
+		setCompactVersionTree(checkbox.checked);
+		rebuildCatalogTree();
+		logAction(logT(checkbox.checked ? "actionLog.compactVersionsOn" : "actionLog.compactVersionsOff"));
+	});
+}
+
 // Baut den PowerShell-Befehl, der prime.exe aus dem Mods-Ordner unter einem ANDEREN
 // Windows-Benutzerkonto startet (siehe Nutzerwunsch: Start-Process -Credential). username/modsPath
 // leer -> Platzhalter. In der PWA-Bauform MUSS der Nutzer modsPath weiterhin selbst eintragen/
@@ -9741,7 +9908,7 @@ const NODE_MATERIALIZE_DURATION_MS = 500;
 // selbst) - bei z.B. 40 Knoten macht das 40*18ms=720ms Gesamt-Staffelung, spuerbar als "nacheinander"
 // ohne den Aufbau spuerbar zu verlangsamen.
 const NODE_MATERIALIZE_STAGGER_MS = 18;
-function animateNodeMaterialize(nodeId, targetR) {
+function animateNodeMaterialize(nodeId, targetR, generation) {
 	const node = config.nodes.find(n => n.id === nodeId);
 	if (!node) return;
 	// KEIN firePulsarBurst hier (anders als beim einzelnen Installieren, siehe
@@ -9749,13 +9916,16 @@ function animateNodeMaterialize(nodeId, targetR) {
 	// innerhalb von unter einer Sekunde, ein Ring-Burst PRO Knoten ergab optisch ein ueberladenes
 	// "Blumenmuster" aus lauter ueberlappenden Ringen statt einer ruhigen Reihe einzeln
 	// erscheinender Kreise (per Screenshot geprueft).
-	const st = nodeHoverState.get(nodeId);
 	const start = performance.now();
 	function tick(now) {
+		if (generation !== undefined && generation !== catalogTreeGeneration) return;
+		const live = config.nodes.find(n => n.id === nodeId);
+		if (!live) return;
 		const t = Math.min(1, (now - start) / NODE_MATERIALIZE_DURATION_MS);
 		const grown = targetR * easeOutCubic(t);
-		node.r = grown;
-		if (st) { st.baseR = grown; st.t = 0; st.target = 0; }
+		live.r = grown;
+		const liveSt = nodeHoverState.get(nodeId);
+		if (liveSt) { liveSt.baseR = grown; liveSt.t = 0; liveSt.target = 0; }
 		if (t < 1) requestAnimationFrame(tick);
 	}
 	requestAnimationFrame(tick);
@@ -10471,6 +10641,7 @@ async function installModVersion(node) {
 		appendModDlLog(meta, t('modDownload.logInstallDonePrefix') + installedTargets.length);
 		queueBranchConnectAnimation(meta.modId, node.id);
 		reconcileBranchTipForModId(meta.modId);
+		refreshCompactTree();
 		renderPanelActionButton(node);
 		setPanelActionStatus(t('installStatus.done'), 'ok');
 		// Nutzerwunsch: "если поверх одной версии мода устанавливается другая - не нужно показывать
@@ -10574,6 +10745,7 @@ async function uninstallModVersion(node) {
 		appendModDlLog(meta, t('modDownload.logUninstallDonePrefix'));
 		if (!isModIdInstalled(meta.modId)) queueBranchDisconnectAnimation(meta.modId);
 		reconcileBranchTipForModId(meta.modId);
+		refreshCompactTree();
 		renderPanelActionButton(node);
 		setPanelActionStatus(t('installStatus.uninstallDone'), 'ok');
 	}
@@ -10885,7 +11057,8 @@ async function reconcileInstalledModsWithClientFolder() {
 		// darum optisch dauerhaft "nicht verbunden", selbst nach einem Neustart. animateBranchConnected
 		// ist idempotent (no-op, wenn der Pfad schon existiert), darum hier einfach fuer JEDE betroffene
 		// Mod-Id aufgerufen statt nur fuer tatsaechlich geaenderte.
-		affectedModIds.forEach((modId) => { reconcileBranchTipForModId(modId); animateBranchConnected(modId); });
+		if (isCompactVersionTree() && (duplicatesRemoved || staleRecordsRemoved)) refreshCompactTree();
+		else affectedModIds.forEach((modId) => { reconcileBranchTipForModId(modId); animateBranchConnected(modId); });
 
 		logAction("Installed-mods reconciliation done: checked " + checked + " target file(s) across " + byModId.size + " mod(s), " + missingFiles + " missing file(s) found.");
 	}
@@ -11070,7 +11243,11 @@ async function discoverPreexistingModInstalls(catalogEntries) {
 		// Mod als Datensatz zwar korrekt in INSTALLED_MODS_KEY, aber optisch nie mit dem Hub verbunden
 		// (der Wurzel-zu-Hub-Pfad entsteht sonst nur einmalig synchron VOR dieser fire-and-forget-
 		// Funktion, siehe initInterface).
-		if (discovered) newlyDiscoveredModIds.forEach((modId) => { reconcileBranchTipForModId(modId); animateBranchConnected(modId); });
+		if (discovered)
+		{
+			if (isCompactVersionTree()) refreshCompactTree();
+			else newlyDiscoveredModIds.forEach((modId) => { reconcileBranchTipForModId(modId); animateBranchConnected(modId); });
+		}
 		logAction("Pre-existing install discovery done under \"" + copyName + "\": " + dllEntries.length + " DLL(s) scanned, " + discovered + " newly discovered.");
 	}
 	catch (err)
@@ -11408,6 +11585,7 @@ async function deleteModVersionAndCache(node, ui) {
 		logAction("Deleted installed files for " + meta.modId + " v" + meta.version);
 		if (!isModIdInstalled(meta.modId)) queueBranchDisconnectAnimation(meta.modId);
 		reconcileBranchTipForModId(meta.modId);
+		refreshCompactTree();
 		renderPanelActionButton(node);
 	}
 
@@ -14848,11 +15026,12 @@ async function initGameFolderPicker(container) {
 	// Reihenfolge (Nutzerwunsch): die beiden Anzeige-Einstellungen (Text/Ladeanimation
 	// ueberspringen) zuerst, danach Ordnerauswahl/Kopie-Name/Start-aus-anderem-Konto/Mod-Quellen,
 	// die Log-Download-Sektion ganz am Ende (siehe initLogDownloadField).
-	container.innerHTML = '<div id="skipAnimField"></div>' + '<div id="skipBootField"></div>' + '<div id="hideAssemblyField"></div>' + '<div id="hideLangNodeField"></div>' + gameFolderPicker.html() + '<div id="copyFolderNameField"></div>' + '<div id="clientPrepareField"></div>' + '<div id="lnkField"></div>' + '<div id="modSourcesField"></div>' + '<div id="logDownloadField"></div>';
+	container.innerHTML = '<div id="skipAnimField"></div>' + '<div id="skipBootField"></div>' + '<div id="hideAssemblyField"></div>' + '<div id="hideLangNodeField"></div>' + '<div id="compactVersionsField"></div>' + gameFolderPicker.html() + '<div id="copyFolderNameField"></div>' + '<div id="clientPrepareField"></div>' + '<div id="lnkField"></div>' + '<div id="modSourcesField"></div>' + '<div id="logDownloadField"></div>';
 	initSkipAnimToggle(document.getElementById("skipAnimField"));
 	initSkipBootToggle(document.getElementById("skipBootField"));
 	initHideAssemblyToggle(document.getElementById("hideAssemblyField"));
 	initHideLangNodeToggle(document.getElementById("hideLangNodeField"));
+	initCompactVersionsToggle(document.getElementById("compactVersionsField"));
 	initCopyFolderNameField(document.getElementById("copyFolderNameField"));
 	initClientPrepareField(document.getElementById("clientPrepareField"));
 	initLnkLauncherField(document.getElementById("lnkField"));
