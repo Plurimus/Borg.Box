@@ -1,6 +1,6 @@
 {
 	"name": "borg-box-desktop",
-	"version": "1.0.341",
+	"version": "1.0.344",
 	"private": true,
 	"description": "Tauri desktop shell for Borg.Box (STFC mod manager) - see Borg.Box/ for the actual frontend, this is only the native wrapper.",
 	"scripts": {

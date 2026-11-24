@@ -11,6 +11,7 @@ The frontend for the **Borg.Box** Tauri desktop app (STFC mod manager), built on
 - [`js/native-io.js`](js/native-io.js) — routes file-system calls through Tauri's native fs/dialog plugins instead of the browser's File System Access API (which blocks writing `.dll`/`.exe`)
 - [`icons/`](icons/) — generated app icons and `favicon.ico`
 - Draggable nodes/hub and a live pulse-tracking engine were added on top of the original demo.
+- Hub settings for compacting the version tree, preparing a client copy, and backing up / restoring that copy. The archive work itself runs in the Tauri/Rust shell (`../src-tauri`), not in this frontend.
 
 ## Running locally
 
@@ -20,7 +21,7 @@ For a quick preview without building the Tauri app, any static file server works
 npx serve .
 ```
 
-Real file-system access (installing mods) only works inside the actual Tauri app (`npm run dev` / `npm run build` in the parent folder) - a plain browser tab has no `window.__TAURI__` and falls back to the browser's own (write-restricted) File System Access API.
+Real file-system access (installing mods, preparing/copying the client, backup and restore) only works inside the actual Tauri app (`npm run dev` / `npm run build` in the parent folder) - a plain browser tab has no `window.__TAURI__` and falls back to the browser's own (write-restricted) File System Access API. `npm run build` bumps the patch version first; `npm run dev` does not.
 
 ## Configuring the neural tree
 

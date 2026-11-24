@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "1.0.341"
+version = "1.0.344"
 description = "A Tauri App"
 authors = ["you"]
 license = ""
@@ -30,6 +30,9 @@ tauri-plugin-fs = "2"
 # echten nativen Zugriff, den kein JS-Plugin bietet, darum eigene #[tauri::command]s (siehe
 # src/lib.rs).
 sysinfo = "0.32"
+# Voller Backup-Zip der Mods-Client-Kopie (siehe backup_client_copy_folder in src/lib.rs) -
+# Stored statt Deflate: Unity-Builds sind schon komprimierte Assets/DLLs, Deflate kostet nur Zeit.
+zip = { version = "2", default-features = false }
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55"

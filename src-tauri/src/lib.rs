@@ -261,6 +261,228 @@ fn remove_client_copy_folder(app: tauri::AppHandle, target: String) -> Result<u6
   Ok(total_files)
 }
 
+// "Создать бэкап" (Nutzerwunsch) - volles ZIP der Client-Kopie MIT installierten Mods. Selbes
+// Muster wie copy_client_folder: erst Groesse zaehlen, dann datei-fuer-datei schreiben und per
+// "backup-client-progress"-Event (max. alle 100ms) melden. Bewusst Stored (keine Kompression):
+// ein Unity-Client ist mehrere GB aus bereits gepackten Assets/DLLs, Deflate wuerde die Datei
+// kaum kleiner machen und die Archivierung um Groessenordnungen verlangsamen. ZIP64
+// (large_file) ist Pflicht, weil das Archiv die 4-GB-Grenze eines klassischen ZIP leicht
+// ueberschreitet. Die Zieldatei selbst wird uebersprungen, falls jemand sie versehentlich IN
+// den Quellordner legt - sonst wuerde der Walk die gerade wachsende Zip-Datei mitarchivieren.
+#[derive(Serialize, Clone)]
+struct BackupProgress {
+  done_bytes: u64,
+  total_bytes: u64,
+  current_file: String,
+  done: bool,
+}
+
+fn path_key(p: &std::path::Path) -> String {
+  p.to_string_lossy().replace('/', "\\").trim_end_matches('\\').to_lowercase()
+}
+
+fn path_is_under(child: &std::path::Path, parent: &std::path::Path) -> bool {
+  let parent_key = path_key(parent);
+  let child_key = path_key(child);
+  child_key == parent_key || child_key.starts_with(&(parent_key + "\\"))
+}
+
+fn zip_dir_recursive(
+  src_root: &std::path::Path,
+  dir: &std::path::Path,
+  zip: &mut zip::ZipWriter<std::fs::File>,
+  skip_key: &str,
+  app: &tauri::AppHandle,
+  done_bytes: &mut u64,
+  total_bytes: u64,
+  last_emit: &mut std::time::Instant,
+) -> Result<(), String> {
+  let options = zip::write::SimpleFileOptions::default()
+    .compression_method(zip::CompressionMethod::Stored)
+    .large_file(true);
+  let entries = std::fs::read_dir(dir).map_err(|e| e.to_string())?;
+  for entry in entries {
+    let entry = entry.map_err(|e| e.to_string())?;
+    let path = entry.path();
+    if path_key(&path) == skip_key {
+      continue;
+    }
+    let file_type = entry.file_type().map_err(|e| e.to_string())?;
+    let rel = path
+      .strip_prefix(src_root)
+      .map_err(|e| e.to_string())?
+      .to_string_lossy()
+      .replace('\\', "/");
+    if file_type.is_dir() {
+      zip
+        .add_directory(format!("{}/", rel), options)
+        .map_err(|e| e.to_string())?;
+      zip_dir_recursive(src_root, &path, zip, skip_key, app, done_bytes, total_bytes, last_emit)?;
+    } else if file_type.is_file() {
+      zip.start_file(&rel, options).map_err(|e| e.to_string())?;
+      let mut file = std::fs::File::open(&path).map_err(|e| e.to_string())?;
+      std::io::copy(&mut file, zip).map_err(|e| e.to_string())?;
+      *done_bytes += entry.metadata().map_err(|e| e.to_string())?.len();
+      if last_emit.elapsed().as_millis() >= 100 {
+        let _ = app.emit(
+          "backup-client-progress",
+          BackupProgress {
+            done_bytes: *done_bytes,
+            total_bytes,
+            current_file: rel,
+            done: false,
+          },
+        );
+        *last_emit = std::time::Instant::now();
+      }
+    }
+  }
+  Ok(())
+}
+
+#[tauri::command]
+fn backup_client_copy_folder(app: tauri::AppHandle, source: String, dest: String) -> Result<u64, String> {
+  let source_path = std::path::Path::new(&source);
+  let dest_path = std::path::Path::new(&dest);
+  if !source_path.is_dir() {
+    return Err(format!("Source folder does not exist: {}", source));
+  }
+  if dest_path.is_dir() {
+    return Err(format!("Backup destination is a folder, not a file: {}", dest));
+  }
+  if let Some(parent) = dest_path.parent() {
+    if !parent.as_os_str().is_empty() {
+      std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+  }
+  let total_bytes = dir_total_size(source_path).map_err(|e| e.to_string())?;
+  let _ = app.emit(
+    "backup-client-progress",
+    BackupProgress { done_bytes: 0, total_bytes, current_file: String::new(), done: false },
+  );
+  let skip_key = path_key(dest_path);
+  let write = || -> Result<u64, String> {
+    let file = std::fs::File::create(dest_path).map_err(|e| e.to_string())?;
+    let mut zip = zip::ZipWriter::new(file);
+    let mut done_bytes: u64 = 0;
+    let mut last_emit = std::time::Instant::now();
+    zip_dir_recursive(
+      source_path,
+      source_path,
+      &mut zip,
+      &skip_key,
+      &app,
+      &mut done_bytes,
+      total_bytes,
+      &mut last_emit,
+    )?;
+    zip.finish().map_err(|e| e.to_string())?;
+    Ok(done_bytes)
+  };
+  match write() {
+    Ok(done_bytes) => {
+      let _ = app.emit(
+        "backup-client-progress",
+        BackupProgress {
+          done_bytes: total_bytes.max(done_bytes),
+          total_bytes: total_bytes.max(done_bytes),
+          current_file: String::new(),
+          done: true,
+        },
+      );
+      Ok(done_bytes)
+    }
+    Err(err) => {
+      let _ = std::fs::remove_file(dest_path);
+      Err(err)
+    }
+  }
+}
+
+// "Восстановить" (Nutzerwunsch) - entpackt ein zuvor erzeugtes Backup-ZIP in den Client-Kopie-
+// Ordner. Selbes Fortschritts-Muster wie backup_client_copy_folder, Event "restore-client-progress".
+// enclosed_name() blockiert Zip-Slip (`../` aus dem Archiv heraus). Vorhandene Dateien werden
+// ueberschrieben; Dateien, die nur in der aktuellen Kopie liegen und nicht im Archiv, bleiben.
+#[tauri::command]
+fn restore_client_copy_folder(app: tauri::AppHandle, archive: String, dest: String) -> Result<u64, String> {
+  let archive_path = std::path::Path::new(&archive);
+  let dest_path = std::path::Path::new(&dest);
+  if !archive_path.is_file() {
+    return Err(format!("Backup archive does not exist: {}", archive));
+  }
+  std::fs::create_dir_all(dest_path).map_err(|e| e.to_string())?;
+  if !dest_path.is_dir() {
+    return Err(format!("Restore destination is not a folder: {}", dest));
+  }
+
+  let file = std::fs::File::open(archive_path).map_err(|e| e.to_string())?;
+  let mut zip = zip::ZipArchive::new(file).map_err(|e| e.to_string())?;
+  let mut total_bytes = 0u64;
+  for i in 0..zip.len() {
+    let entry = zip.by_index(i).map_err(|e| e.to_string())?;
+    if !entry.is_dir() {
+      total_bytes += entry.size();
+    }
+  }
+  let _ = app.emit(
+    "restore-client-progress",
+    BackupProgress { done_bytes: 0, total_bytes, current_file: String::new(), done: false },
+  );
+
+  let mut done_bytes = 0u64;
+  let mut last_emit = std::time::Instant::now();
+  let mut buf = [0u8; 1024 * 1024];
+  for i in 0..zip.len() {
+    let mut entry = zip.by_index(i).map_err(|e| e.to_string())?;
+    let Some(rel) = entry.enclosed_name() else { continue };
+    if rel.as_os_str().is_empty() {
+      continue;
+    }
+    let outpath = dest_path.join(rel);
+    if !path_is_under(&outpath, dest_path) {
+      continue;
+    }
+    if entry.is_dir() {
+      std::fs::create_dir_all(&outpath).map_err(|e| e.to_string())?;
+      continue;
+    }
+    if let Some(parent) = outpath.parent() {
+      std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let mut outfile = std::fs::File::create(&outpath).map_err(|e| e.to_string())?;
+    loop {
+      let n = std::io::Read::read(&mut entry, &mut buf).map_err(|e| e.to_string())?;
+      if n == 0 {
+        break;
+      }
+      std::io::Write::write_all(&mut outfile, &buf[..n]).map_err(|e| e.to_string())?;
+      done_bytes += n as u64;
+      if last_emit.elapsed().as_millis() >= 100 {
+        let _ = app.emit(
+          "restore-client-progress",
+          BackupProgress {
+            done_bytes,
+            total_bytes,
+            current_file: outpath.to_string_lossy().to_string(),
+            done: false,
+          },
+        );
+        last_emit = std::time::Instant::now();
+      }
+    }
+  }
+  let _ = app.emit(
+    "restore-client-progress",
+    BackupProgress {
+      done_bytes: total_bytes.max(done_bytes),
+      total_bytes: total_bytes.max(done_bytes),
+      current_file: String::new(),
+      done: true,
+    },
+  );
+  Ok(done_bytes)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   // Nutzerbeobachtung: ein Windows-11-Pro-Nutzer sah nach Installation per NSIS/MSI (nicht bei der
@@ -290,7 +512,9 @@ pub fn run() {
       find_prime_exe_process,
       find_stfc_registry_entries,
       copy_client_folder,
-      remove_client_copy_folder
+      remove_client_copy_folder,
+      backup_client_copy_folder,
+      restore_client_copy_folder
     ])
     .setup(move |app| {
       if cfg!(debug_assertions) {

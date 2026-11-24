@@ -1025,6 +1025,66 @@ input[type="file"].folder-name-input {
 	gap: 8px;
 }
 
+.folder-picker-actions + .folder-picker-actions,
+.folder-picker-actions + .folder-picker-hint {
+	margin-top: 8px;
+}
+
+.backup-log-list {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	max-height: 180px;
+	overflow-y: auto;
+	margin-bottom: 8px;
+	border: 1px solid rgba(78, 255, 68, 0.3);
+	border-radius: 6px;
+	padding: 4px;
+	background: rgba(78, 255, 68, 0.04);
+}
+
+.backup-log-empty {
+	font-family: 'Courier New', monospace;
+	font-size: 11px;
+	opacity: 0.6;
+	padding: 8px;
+}
+
+.backup-log-row {
+	cursor: pointer;
+	padding: 6px 8px;
+	border: 1px solid transparent;
+	border-radius: 4px;
+	color: var(--borg-green);
+}
+
+.backup-log-row:hover {
+	background: rgba(78, 255, 68, 0.1);
+}
+
+.backup-log-row.selected {
+	border-color: var(--borg-green);
+	background: rgba(78, 255, 68, 0.14);
+}
+
+.backup-log-row.missing {
+	opacity: 0.45;
+	cursor: default;
+}
+
+.backup-log-row-name {
+	font-family: 'Courier New', monospace;
+	font-size: 12px;
+	word-break: break-all;
+}
+
+.backup-log-row-meta {
+	font-family: 'Courier New', monospace;
+	font-size: 10px;
+	opacity: 0.7;
+	margin-top: 2px;
+}
+
 /* Nutzerwunsch: Установить/Отключить (main.js #panelActionBtn, sonst 100%-breit/eigenstaendig,
    siehe .panel-action-btn) wird bei einem Mod-Knoten JETZT per JS in dieselbe Zeile wie
    Загрузить/Удалить gehaengt (initModDownloadField) - hier auf dieselbe auto-Breite/Optik wie
@@ -1125,7 +1185,7 @@ input[type="file"].folder-name-input {
 	background: rgba(78, 255, 68, 0.22);
 }
 
-.folder-pick-btn:disabled {
+.folder-pick-btn:disabled, .folder-forget-btn:disabled {
 	opacity: 0.4;
 	cursor: default;
 }

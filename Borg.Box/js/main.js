@@ -3616,7 +3616,25 @@ const I18N_PACKS = {
 			filesLabel: "файлов",
 			deleted: "Копия клиента удалена.",
 			deleteErrorPrefix: "Ошибка удаления: ",
-			originalVersionPrefix: "Оригинал: ", copyVersionPrefix: "Копия: "
+			originalVersionPrefix: "Оригинал: ", copyVersionPrefix: "Копия: ",
+			backupBtn: "Создать бэкап",
+			backupHint: "Полный zip-архив папки-копии клиента вместе с установленными модами. В имя файла добавляется версия клиента.",
+			backuping: "Архивирую: ",
+			backupDone: "Бэкап сохранён: ",
+			backupErrorPrefix: "Ошибка бэкапа: ",
+			backupLogLabel: "Журнал бэкапов",
+			backupLogEmpty: "Пока нет бэкапов.",
+			backupLogMissing: "файл не найден",
+			restoreBtn: "Восстановить выбранный",
+			restoreHint: "Распаковывает выбранный архив в папку-копию клиента. Существующие файлы перезаписываются.",
+			restoreConfirmPrompt: "Распаковать этот бэкап в папку-копию клиента? Существующие файлы будут перезаписаны.",
+			restoreConfirmBtn: "Да, восстановить",
+			restoreCancelBtn: "Отмена",
+			restoring: "Распаковываю: ",
+			restoreDone: "Бэкап восстановлен: ",
+			restoreErrorPrefix: "Ошибка восстановления: ",
+			restoreNeedSelect: "Выберите бэкап из списка.",
+			restoreNeedCopy: "Сначала выберите или найдите папку клиента игры."
 		},
 		modDownload: {
 			label: "Загрузка и проверка мод-пака",
@@ -4012,7 +4030,25 @@ const I18N_PACKS = {
 			filesLabel: "files",
 			deleted: "Client copy deleted.",
 			deleteErrorPrefix: "Delete failed: ",
-			originalVersionPrefix: "Original: ", copyVersionPrefix: "Copy: "
+			originalVersionPrefix: "Original: ", copyVersionPrefix: "Copy: ",
+			backupBtn: "Create backup",
+			backupHint: "Full zip archive of the modification copy folder including installed mods. The client version is added to the file name.",
+			backuping: "Archiving: ",
+			backupDone: "Backup saved: ",
+			backupErrorPrefix: "Backup failed: ",
+			backupLogLabel: "Backup log",
+			backupLogEmpty: "No backups yet.",
+			backupLogMissing: "file not found",
+			restoreBtn: "Restore selected",
+			restoreHint: "Unpacks the selected archive into the client copy folder. Existing files are overwritten.",
+			restoreConfirmPrompt: "Unpack this backup into the client copy folder? Existing files will be overwritten.",
+			restoreConfirmBtn: "Yes, restore",
+			restoreCancelBtn: "Cancel",
+			restoring: "Unpacking: ",
+			restoreDone: "Backup restored: ",
+			restoreErrorPrefix: "Restore failed: ",
+			restoreNeedSelect: "Select a backup from the list.",
+			restoreNeedCopy: "Select or find the game client folder first."
 		},
 		modDownload: {
 			label: "Download and verify mod pack",
@@ -4449,7 +4485,25 @@ const I18N_PACKS = {
 			deleteCancelBtn: "Abbrechen",
 			deleteErrorPrefix: "Löschen fehlgeschlagen: ",
 			originalVersionPrefix: "Original: ",
-			copyVersionPrefix: "Kopie: "
+			copyVersionPrefix: "Kopie: ",
+			backupBtn: "Backup erstellen",
+			backupHint: "Vollständiges ZIP-Archiv des Kopie-Ordners inklusive installierter Mods. Die Client-Version wird in den Dateinamen übernommen.",
+			backuping: "Archiviere: ",
+			backupDone: "Backup gespeichert: ",
+			backupErrorPrefix: "Backup fehlgeschlagen: ",
+			backupLogLabel: "Backup-Protokoll",
+			backupLogEmpty: "Noch keine Backups.",
+			backupLogMissing: "Datei nicht gefunden",
+			restoreBtn: "Ausgewähltes wiederherstellen",
+			restoreHint: "Entpackt das ausgewählte Archiv in den Client-Kopie-Ordner. Vorhandene Dateien werden überschrieben.",
+			restoreConfirmPrompt: "Dieses Backup in den Client-Kopie-Ordner entpacken? Vorhandene Dateien werden überschrieben.",
+			restoreConfirmBtn: "Ja, wiederherstellen",
+			restoreCancelBtn: "Abbrechen",
+			restoring: "Entpacke: ",
+			restoreDone: "Backup wiederhergestellt: ",
+			restoreErrorPrefix: "Wiederherstellung fehlgeschlagen: ",
+			restoreNeedSelect: "Wählen Sie ein Backup aus der Liste.",
+			restoreNeedCopy: "Wählen oder finden Sie zuerst den Spielclient-Ordner."
 		},
 		modDownload: {
 			label: "Mod-Paket herunterladen und verifizieren",
@@ -4794,7 +4848,25 @@ const I18N_PACKS = {
 			deleteCancelBtn: "Annulla",
 			deleteErrorPrefix: "Impossibile eliminare: ",
 			originalVersionPrefix: "Originale: ",
-			copyVersionPrefix: "Copia: "
+			copyVersionPrefix: "Copia: ",
+			backupBtn: "Crea backup",
+			backupHint: "Archivio zip completo della cartella copia del client, con le mod installate. La versione del client viene aggiunta al nome del file.",
+			backuping: "Archiviazione: ",
+			backupDone: "Backup salvato: ",
+			backupErrorPrefix: "Backup non riuscito: ",
+			backupLogLabel: "Registro backup",
+			backupLogEmpty: "Nessun backup ancora.",
+			backupLogMissing: "file non trovato",
+			restoreBtn: "Ripristina selezionato",
+			restoreHint: "Estrae l'archivio selezionato nella cartella copia del client. I file esistenti vengono sovrascritti.",
+			restoreConfirmPrompt: "Estrarre questo backup nella cartella copia del client? I file esistenti verranno sovrascritti.",
+			restoreConfirmBtn: "Sì, ripristina",
+			restoreCancelBtn: "Annulla",
+			restoring: "Estrazione: ",
+			restoreDone: "Backup ripristinato: ",
+			restoreErrorPrefix: "Ripristino non riuscito: ",
+			restoreNeedSelect: "Seleziona un backup dall'elenco.",
+			restoreNeedCopy: "Seleziona o trova prima la cartella del client di gioco."
 		},
 		modDownload: {
 			label: "Scarica e verifica il pacchetto mod",
@@ -5139,7 +5211,25 @@ const I18N_PACKS = {
 			deleteCancelBtn: "Annuler",
 			deleteErrorPrefix: "Échec de la suppression : ",
 			originalVersionPrefix: "Original : ",
-			copyVersionPrefix: "Copie : "
+			copyVersionPrefix: "Copie : ",
+			backupBtn: "Créer une sauvegarde",
+			backupHint: "Archive zip complète du dossier de copie du client, mods inclus. La version du client est ajoutée au nom du fichier.",
+			backuping: "Archivage : ",
+			backupDone: "Sauvegarde enregistrée : ",
+			backupErrorPrefix: "Échec de la sauvegarde : ",
+			backupLogLabel: "Journal des sauvegardes",
+			backupLogEmpty: "Aucune sauvegarde pour le moment.",
+			backupLogMissing: "fichier introuvable",
+			restoreBtn: "Restaurer la sélection",
+			restoreHint: "Décompresse l'archive sélectionnée dans le dossier de copie du client. Les fichiers existants sont écrasés.",
+			restoreConfirmPrompt: "Décompresser cette sauvegarde dans le dossier de copie du client ? Les fichiers existants seront écrasés.",
+			restoreConfirmBtn: "Oui, restaurer",
+			restoreCancelBtn: "Annuler",
+			restoring: "Décompression : ",
+			restoreDone: "Sauvegarde restaurée : ",
+			restoreErrorPrefix: "Échec de la restauration : ",
+			restoreNeedSelect: "Sélectionnez une sauvegarde dans la liste.",
+			restoreNeedCopy: "Sélectionnez ou trouvez d'abord le dossier du client du jeu."
 		},
 		modDownload: {
 			label: "Télécharger et vérifier le pack de mods",
@@ -5484,7 +5574,25 @@ const I18N_PACKS = {
 			deleteCancelBtn: "Cancelar",
 			deleteErrorPrefix: "Error al eliminar: ",
 			originalVersionPrefix: "Original: ",
-			copyVersionPrefix: "Copia: "
+			copyVersionPrefix: "Copia: ",
+			backupBtn: "Crear copia de seguridad",
+			backupHint: "Archivo zip completo de la carpeta de copia del cliente, con los mods instalados. La versión del cliente se añade al nombre del archivo.",
+			backuping: "Archivando: ",
+			backupDone: "Copia de seguridad guardada: ",
+			backupErrorPrefix: "Error de copia de seguridad: ",
+			backupLogLabel: "Registro de copias de seguridad",
+			backupLogEmpty: "Aún no hay copias de seguridad.",
+			backupLogMissing: "archivo no encontrado",
+			restoreBtn: "Restaurar seleccionada",
+			restoreHint: "Descomprime el archivo seleccionado en la carpeta de copia del cliente. Los archivos existentes se sobrescriben.",
+			restoreConfirmPrompt: "¿Descomprimir esta copia de seguridad en la carpeta de copia del cliente? Se sobrescribirán los archivos existentes.",
+			restoreConfirmBtn: "Sí, restaurar",
+			restoreCancelBtn: "Cancelar",
+			restoring: "Descomprimiendo: ",
+			restoreDone: "Copia de seguridad restaurada: ",
+			restoreErrorPrefix: "Error de restauración: ",
+			restoreNeedSelect: "Seleccione una copia de seguridad de la lista.",
+			restoreNeedCopy: "Primero seleccione o busque la carpeta del cliente del juego."
 		},
 		modDownload: {
 			label: "Descargar y verificar el paquete del mod",
@@ -5829,7 +5937,25 @@ const I18N_PACKS = {
 			deleteCancelBtn: "Cancelar",
 			deleteErrorPrefix: "Falha ao excluir: ",
 			originalVersionPrefix: "Original: ",
-			copyVersionPrefix: "Cópia: "
+			copyVersionPrefix: "Cópia: ",
+			backupBtn: "Criar backup",
+			backupHint: "Arquivo zip completo da pasta de cópia do cliente, com os mods instalados. A versão do cliente é adicionada ao nome do ficheiro.",
+			backuping: "A arquivar: ",
+			backupDone: "Backup guardado: ",
+			backupErrorPrefix: "Falha no backup: ",
+			backupLogLabel: "Registo de backups",
+			backupLogEmpty: "Ainda não há backups.",
+			backupLogMissing: "ficheiro não encontrado",
+			restoreBtn: "Restaurar selecionado",
+			restoreHint: "Descompacta o arquivo selecionado para a pasta de cópia do cliente. Os ficheiros existentes são substituídos.",
+			restoreConfirmPrompt: "Descompactar este backup para a pasta de cópia do cliente? Os ficheiros existentes serão substituídos.",
+			restoreConfirmBtn: "Sim, restaurar",
+			restoreCancelBtn: "Cancelar",
+			restoring: "A descompactar: ",
+			restoreDone: "Backup restaurado: ",
+			restoreErrorPrefix: "Falha na restauração: ",
+			restoreNeedSelect: "Selecione um backup da lista.",
+			restoreNeedCopy: "Selecione ou encontre primeiro a pasta do cliente do jogo."
 		},
 		modDownload: {
 			label: "Baixar e verificar o pacote do mod",
@@ -6174,7 +6300,25 @@ const I18N_PACKS = {
 			deleteCancelBtn: "취소",
 			deleteErrorPrefix: "삭제 실패: ",
 			originalVersionPrefix: "원본: ",
-			copyVersionPrefix: "복사본: "
+			copyVersionPrefix: "복사본: ",
+			backupBtn: "백업 만들기",
+			backupHint: "설치된 모드가 포함된 클라이언트 복사 폴더의 전체 zip 보관 파일입니다. 파일 이름에 클라이언트 버전이 들어갑니다.",
+			backuping: "압축 중: ",
+			backupDone: "백업 저장됨: ",
+			backupErrorPrefix: "백업 실패: ",
+			backupLogLabel: "백업 기록",
+			backupLogEmpty: "아직 백업이 없습니다.",
+			backupLogMissing: "파일을 찾을 수 없음",
+			restoreBtn: "선택한 항목 복원",
+			restoreHint: "선택한 보관 파일을 클라이언트 복사 폴더에 풉니다. 기존 파일은 덮어씁니다.",
+			restoreConfirmPrompt: "이 백업을 클라이언트 복사 폴더에 푸시겠습니까? 기존 파일이 덮어쓰입니다.",
+			restoreConfirmBtn: "예, 복원",
+			restoreCancelBtn: "취소",
+			restoring: "압축 해제 중: ",
+			restoreDone: "백업 복원됨: ",
+			restoreErrorPrefix: "복원 실패: ",
+			restoreNeedSelect: "목록에서 백업을 선택하세요.",
+			restoreNeedCopy: "먼저 게임 클라이언트 폴더를 선택하거나 찾으세요."
 		},
 		modDownload: {
 			label: "모드 팩 다운로드 및 검증",
@@ -6519,7 +6663,25 @@ const I18N_PACKS = {
 			deleteCancelBtn: "取消",
 			deleteErrorPrefix: "删除失败：",
 			originalVersionPrefix: "原始：",
-			copyVersionPrefix: "副本："
+			copyVersionPrefix: "副本：",
+			backupBtn: "创建备份",
+			backupHint: "包含已安装模组的客户端副本文件夹完整 zip 归档。文件名中会加入客户端版本。",
+			backuping: "正在打包：",
+			backupDone: "备份已保存：",
+			backupErrorPrefix: "备份失败：",
+			backupLogLabel: "备份记录",
+			backupLogEmpty: "还没有备份。",
+			backupLogMissing: "找不到文件",
+			restoreBtn: "还原所选备份",
+			restoreHint: "将所选归档解压到客户端副本文件夹。现有文件会被覆盖。",
+			restoreConfirmPrompt: "要将此备份解压到客户端副本文件夹吗？现有文件将被覆盖。",
+			restoreConfirmBtn: "是，还原",
+			restoreCancelBtn: "取消",
+			restoring: "正在解压：",
+			restoreDone: "备份已还原：",
+			restoreErrorPrefix: "还原失败：",
+			restoreNeedSelect: "请从列表中选择一个备份。",
+			restoreNeedCopy: "请先选择或查找游戏客户端文件夹。"
 		},
 		modDownload: {
 			label: "下载并验证模组包",
@@ -6864,7 +7026,25 @@ const I18N_PACKS = {
 			deleteCancelBtn: "キャンセル",
 			deleteErrorPrefix: "削除に失敗しました: ",
 			originalVersionPrefix: "オリジナル: ",
-			copyVersionPrefix: "コピー: "
+			copyVersionPrefix: "コピー: ",
+			backupBtn: "バックアップを作成",
+			backupHint: "インストール済みModを含むクライアントコピーフォルダの完全なzipアーカイブです。ファイル名にクライアントのバージョンが入ります。",
+			backuping: "アーカイブ中: ",
+			backupDone: "バックアップを保存しました: ",
+			backupErrorPrefix: "バックアップに失敗しました: ",
+			backupLogLabel: "バックアップ履歴",
+			backupLogEmpty: "まだバックアップはありません。",
+			backupLogMissing: "ファイルが見つかりません",
+			restoreBtn: "選択したバックアップを復元",
+			restoreHint: "選択したアーカイブをクライアントコピーフォルダに展開します。既存のファイルは上書きされます。",
+			restoreConfirmPrompt: "このバックアップをクライアントコピーフォルダに展開しますか? 既存のファイルは上書きされます。",
+			restoreConfirmBtn: "はい、復元します",
+			restoreCancelBtn: "キャンセル",
+			restoring: "展開中: ",
+			restoreDone: "バックアップを復元しました: ",
+			restoreErrorPrefix: "復元に失敗しました: ",
+			restoreNeedSelect: "リストからバックアップを選択してください。",
+			restoreNeedCopy: "まずゲームクライアントフォルダを選択または検索してください。"
 		},
 		modDownload: {
 			label: "Modパックのダウンロードと検証",
@@ -7759,6 +7939,60 @@ function formatClientVersionLine(info) {
 	return parts.join(" • ");
 }
 
+// Dateiname fuer den Backup-Zip der Mods-Client-Kopie (Nutzerwunsch: Version des Clients ins
+// Dateinamen). Ungueltige Windows-Zeichen raus, sonst scheitert der native Speicherdialog.
+function sanitizeBackupFileNamePart(s) {
+	return String(s || "")
+		.replace(/[<>:"/\\|?*\u0000-\u001F]/g, "_")
+		.replace(/[. ]+$/g, "")
+		.trim();
+}
+
+function buildClientCopyBackupFileName(copyFolderName, versionInfo) {
+	const parts = [sanitizeBackupFileNamePart(copyFolderName) || "game_mods"];
+	if (versionInfo && versionInfo.numeric) parts.push(sanitizeBackupFileNamePart(versionInfo.numeric));
+	else if (versionInfo && versionInfo.updateTag) parts.push(sanitizeBackupFileNamePart(versionInfo.updateTag));
+	if (parts.length === 1) parts.push("backup");
+	return parts.join("-") + ".zip";
+}
+
+const CLIENT_BACKUP_LOG_KEY = "borg-box-client-backup-log";
+const CLIENT_BACKUP_LOG_MAX = 50;
+
+function loadClientBackupLog() {
+	try
+	{
+		const list = JSON.parse(localStorage.getItem(CLIENT_BACKUP_LOG_KEY) || "[]");
+		return Array.isArray(list) ? list : [];
+	}
+	catch (_) { return []; }
+}
+
+function addClientBackupLogEntry(entry) {
+	try
+	{
+		const pathKey = String(entry.path || "").replace(/\//g, "\\").replace(/\\+$/, "").toLowerCase();
+		const list = loadClientBackupLog().filter((item) =>
+			String(item.path || "").replace(/\//g, "\\").replace(/\\+$/, "").toLowerCase() !== pathKey
+		);
+		list.unshift(entry);
+		while (list.length > CLIENT_BACKUP_LOG_MAX) list.pop();
+		localStorage.setItem(CLIENT_BACKUP_LOG_KEY, JSON.stringify(list));
+	}
+	catch (_) {}
+}
+
+function formatBackupLogTime(iso) {
+	const d = new Date(iso);
+	if (Number.isNaN(d.getTime())) return iso || "";
+	const pad = (n) => String(n).padStart(2, "0");
+	return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+}
+
+function backupFileNameFromPath(p) {
+	return String(p || "").split(/[\\/]/).filter(Boolean).pop() || p;
+}
+
 // Leichtgewichtiger Vorab-Zaehldurchlauf (nur Ordner zaehlen, keine Datei-Metadaten lesen) - liefert
 // die Gesamtzahl der Ordner, die findGameClientFolder mit denselben skipNames tatsaechlich besuchen
 // wird. Grundlage fuer eine ECHTE Prozentanzeige waehrend der C:\Games-Suche (Nutzerwunsch: "добавь
@@ -8131,17 +8365,33 @@ async function initClientPrepareField(container) {
 				'<button class="folder-pick-btn" id="clientPrepareBtn"></button>' +
 				'<button class="folder-forget-btn" id="clientPrepareDeleteBtn"></button>' +
 			'</div>' +
+			'<div class="folder-picker-hint" id="clientPrepareBackupHint"></div>' +
+			'<div class="folder-picker-actions">' +
+				'<button class="folder-pick-btn" id="clientPrepareBackupBtn"></button>' +
+			'</div>' +
+			'<div class="folder-picker-label" id="clientPrepareBackupLogLabel"></div>' +
+			'<div class="backup-log-list" id="clientPrepareBackupLog"></div>' +
+			'<div class="folder-picker-hint" id="clientPrepareRestoreHint"></div>' +
+			'<div class="folder-picker-actions">' +
+				'<button class="folder-pick-btn" id="clientPrepareRestoreBtn"></button>' +
+			'</div>' +
 			// Zweistufige Bestaetigung (Nutzerwunsch: "с подтверждением") - eigene Zeile statt
 			// natives confirm(), damit sie zum Rest der UI passt (dieselbe .folder-picker-status-
 			// Optik wie ueberall sonst). hidden statt CSS :empty - main.css hat keine :empty-Regel
 			// fuer .folder-picker-status, die wuerde also ohne explizites hidden immer 14px hoch
 			// (min-height) und damit sichtbar als leere Zeile dastehen.
 			'<div class="folder-picker-status bad" id="clientPrepareDeleteConfirm" hidden></div>' +
+			'<div class="folder-picker-status bad" id="clientPrepareRestoreConfirm" hidden></div>' +
 		'</div>';
 	revealElementText(document.getElementById("clientPrepareLabel"), t("clientPrepare.label"), 400);
 	revealElementText(document.getElementById("clientPrepareHint"), t("clientPrepare.hint"), 500);
 	revealElementText(document.getElementById("clientPrepareDeleteHint"), t("clientPrepare.deleteHint"), 500);
+	revealElementText(document.getElementById("clientPrepareBackupHint"), t("clientPrepare.backupHint"), 500);
+	revealElementText(document.getElementById("clientPrepareBackupLogLabel"), t("clientPrepare.backupLogLabel"), 400);
+	revealElementText(document.getElementById("clientPrepareRestoreHint"), t("clientPrepare.restoreHint"), 500);
 	revealElementText(document.getElementById("clientPrepareDeleteBtn"), t("clientPrepare.deleteBtn"), 300);
+	revealElementText(document.getElementById("clientPrepareBackupBtn"), t("clientPrepare.backupBtn"), 300);
+	revealElementText(document.getElementById("clientPrepareRestoreBtn"), t("clientPrepare.restoreBtn"), 300);
 
 	const labelEl = document.getElementById("clientPrepareLabel");
 	const hintEl = document.getElementById("clientPrepareHint");
@@ -8150,7 +8400,11 @@ async function initClientPrepareField(container) {
 	const statusEl = document.getElementById("clientPrepareStatus");
 	const btn = document.getElementById("clientPrepareBtn");
 	const deleteBtn = document.getElementById("clientPrepareDeleteBtn");
+	const backupBtn = document.getElementById("clientPrepareBackupBtn");
+	const restoreBtn = document.getElementById("clientPrepareRestoreBtn");
+	const backupLogEl = document.getElementById("clientPrepareBackupLog");
 	const deleteConfirmEl = document.getElementById("clientPrepareDeleteConfirm");
+	const restoreConfirmEl = document.getElementById("clientPrepareRestoreConfirm");
 	const logEl = document.getElementById("clientPrepareLog");
 	const progressWrap = document.getElementById("clientPrepareProgressWrap");
 	const progressFill = document.getElementById("clientPrepareProgressFill");
@@ -8231,25 +8485,87 @@ async function initClientPrepareField(container) {
 	// Zwischenspeicher fuer den Loeschen-Klick (siehe deleteBtn-Handler unten) - resolveSourceAndDest
 	// erneut aufzurufen waere unnoetig, refreshStatus hat destPath schon gerade ermittelt.
 	let lastResolved = null;
+	let lastDestVersionInfo = null;
+	let selectedBackupPath = null;
 	async function refreshStatus() {
 		// Nutzerwunsch: die Hub-Sphaere soll dieselbe Warnung/denselben Fehler widerspiegeln, die
 		// hier im Panel angezeigt wird (siehe refreshHubDataStatus/getClientCopyStatus) - try/finally
 		// statt an jedem einzelnen return, damit KEIN Codepfad (auch ein kuenftig hinzugefuegter)
 		// versehentlich vergisst, den Hub-Kreis mit zu aktualisieren.
 		try { await refreshStatusInner(); } finally { refreshHubDataStatus(); }
+		await renderBackupLog();
+	}
+
+	async function renderBackupLog() {
+		const list = loadClientBackupLog();
+		backupLogEl.innerHTML = "";
+		if (!list.length)
+		{
+			const empty = document.createElement("div");
+			empty.className = "backup-log-empty";
+			empty.textContent = t("clientPrepare.backupLogEmpty");
+			backupLogEl.appendChild(empty);
+			selectedBackupPath = null;
+			restoreBtn.disabled = true;
+			return;
+		}
+		const rows = [];
+		for (const entry of list)
+		{
+			const stat = await window.__borgBoxStatFile(entry.path);
+			rows.push({ entry, exists: !!(stat && stat.exists) });
+		}
+		if (!rows.some((row) => row.exists && row.entry.path === selectedBackupPath))
+		{
+			const firstLive = rows.find((row) => row.exists);
+			selectedBackupPath = firstLive ? firstLive.entry.path : null;
+		}
+		for (const rowInfo of rows)
+		{
+			const entry = rowInfo.entry;
+			const row = document.createElement("div");
+			row.className = "backup-log-row" + (rowInfo.exists ? "" : " missing") + (entry.path === selectedBackupPath ? " selected" : "");
+			row.title = entry.path;
+			const name = document.createElement("div");
+			name.className = "backup-log-row-name";
+			name.textContent = entry.fileName || backupFileNameFromPath(entry.path);
+			const meta = document.createElement("div");
+			meta.className = "backup-log-row-meta";
+			const bits = [formatBackupLogTime(entry.createdAt)];
+			if (entry.version) bits.push(entry.version);
+			if (entry.bytes) bits.push(formatBytesHuman(entry.bytes));
+			if (!rowInfo.exists) bits.push(t("clientPrepare.backupLogMissing"));
+			meta.textContent = bits.join("  •  ");
+			row.appendChild(name);
+			row.appendChild(meta);
+			if (rowInfo.exists)
+			{
+				row.addEventListener("click", () => {
+					selectedBackupPath = entry.path;
+					restoreConfirmEl.hidden = true;
+					renderBackupLog();
+				});
+			}
+			backupLogEl.appendChild(row);
+		}
+		restoreBtn.disabled = !(lastResolved && selectedBackupPath);
 	}
 	async function refreshStatusInner() {
 		deleteConfirmEl.hidden = true;
+		restoreConfirmEl.hidden = true;
 		const resolved = await resolveSourceAndDest();
 		lastResolved = resolved;
 		if (!resolved)
 		{
 			setPath("");
 			setVersions("", "");
+			lastDestVersionInfo = null;
 			setStatus(t("clientPrepare.notReady"), "bad");
 			setCritical("bad");
 			btn.disabled = true;
 			deleteBtn.disabled = true;
+			backupBtn.disabled = true;
+			restoreBtn.disabled = true;
 			revealElementText(btn, t("clientPrepare.btn"), 300);
 			return;
 		}
@@ -8265,10 +8581,12 @@ async function initClientPrepareField(container) {
 		const srcVersionLine = formatClientVersionLine(srcVersionInfo);
 		const copyHasContent = destAssembly.exists || destExe.exists;
 		deleteBtn.disabled = !copyHasContent;
+		backupBtn.disabled = !copyHasContent;
 		if (!copyHasContent)
 		{
 			// Original-Version schon hier zeigen (die Kopie hat noch keine) - nuetzlich, um VOR dem
 			// ersten "Подготовить клиента"-Klick zu sehen, welche Version gleich kopiert wird.
+			lastDestVersionInfo = null;
 			setVersions(srcVersionLine, "");
 			setStatus(t("clientPrepare.notPrepared"), "bad");
 			setCritical("bad");
@@ -8276,6 +8594,7 @@ async function initClientPrepareField(container) {
 			return;
 		}
 		const destVersionInfo = await readClientVersionInfo(resolved.destPath);
+		lastDestVersionInfo = destVersionInfo;
 		setVersions(srcVersionLine, formatClientVersionLine(destVersionInfo));
 		revealElementText(btn, t("clientPrepare.btnUpdate"), 300);
 		const srcAssembly = await window.__borgBoxStatFile(resolved.sourcePath + "\\GameAssembly.dll");
@@ -8302,6 +8621,9 @@ async function initClientPrepareField(container) {
 
 	btn.addEventListener("click", async () => {
 		btn.disabled = true;
+		deleteBtn.disabled = true;
+		backupBtn.disabled = true;
+		restoreBtn.disabled = true;
 		logEl.hidden = false; logEl.innerHTML = "";
 		setProgress(0, null);
 		let unlisten = null;
@@ -8319,7 +8641,6 @@ async function initClientPrepareField(container) {
 			const totalBytes = await TAURI.core.invoke("copy_client_folder", { source: resolved.sourcePath, dest: resolved.destPath });
 			log(t("clientPrepare.done") + formatBytesHuman(totalBytes));
 			logAction("Prepared client copy: " + resolved.sourcePath + " -> " + resolved.destPath + " (" + totalBytes + " bytes)");
-			await refreshStatus();
 		}
 		catch (err)
 		{
@@ -8331,7 +8652,7 @@ async function initClientPrepareField(container) {
 		{
 			if (unlisten) unlisten();
 			setProgress(0, null);
-			btn.disabled = false;
+			await refreshStatus();
 		}
 	});
 
@@ -8341,6 +8662,7 @@ async function initClientPrepareField(container) {
 	// moeglicherweise mehrere GB - EIN Aufruf, das Rust-fs-Plugin rekursiert selbst nativ, kein
 	// dateiweises IPC noetig wie es beim Kopieren der Fall war).
 	deleteBtn.addEventListener("click", () => {
+		restoreConfirmEl.hidden = true;
 		deleteConfirmEl.hidden = false;
 		deleteConfirmEl.innerHTML = "";
 		const prompt = document.createElement("div");
@@ -8365,6 +8687,8 @@ async function initClientPrepareField(container) {
 			if (!lastResolved) return;
 			deleteBtn.disabled = true;
 			btn.disabled = true;
+			backupBtn.disabled = true;
+			restoreBtn.disabled = true;
 			logEl.hidden = false; logEl.innerHTML = "";
 			setProgress(0, null);
 			// Nutzerbeobachtung: "не работает прогресс-бар" - window.__TAURI__.fs.remove(recursive:true)
@@ -8399,6 +8723,139 @@ async function initClientPrepareField(container) {
 			{
 				if (unlisten) unlisten();
 				setProgress(0, null);
+			}
+		});
+	});
+
+	backupBtn.addEventListener("click", async () => {
+		if (!lastResolved) return;
+		btn.disabled = true;
+		deleteBtn.disabled = true;
+		backupBtn.disabled = true;
+		restoreBtn.disabled = true;
+		logEl.hidden = false; logEl.innerHTML = "";
+		setProgress(0, null);
+		let unlisten = null;
+		try
+		{
+			const suggestedName = buildClientCopyBackupFileName(getCopyFolderName(), lastDestVersionInfo);
+			const parentDir = dirnameOfPath(lastResolved.destPath);
+			const handle = await window.showSaveFilePicker({
+				suggestedName: parentDir ? (parentDir + "\\" + suggestedName) : suggestedName,
+				types: [{ description: "ZIP archive", accept: { "application/zip": [".zip"] } }]
+			});
+			const destZip = handle && handle.__tauriPath;
+			if (!destZip) throw new Error("No backup destination");
+			log(lastResolved.destPath + " -> " + destZip);
+			const TAURI = window.__TAURI__;
+			unlisten = await TAURI.event.listen("backup-client-progress", (event) => {
+				const p = event.payload;
+				setProgress(p.done_bytes, p.total_bytes);
+				if (p.current_file) log(t("clientPrepare.backuping") + p.current_file);
+			});
+			const totalBytes = await TAURI.core.invoke("backup_client_copy_folder", {
+				source: lastResolved.destPath,
+				dest: destZip
+			});
+			log(t("clientPrepare.backupDone") + destZip + " (" + formatBytesHuman(totalBytes) + ")");
+			setStatus(t("clientPrepare.backupDone") + destZip, "ok");
+			addClientBackupLogEntry({
+				path: destZip,
+				fileName: backupFileNameFromPath(destZip),
+				version: (lastDestVersionInfo && (lastDestVersionInfo.numeric || lastDestVersionInfo.updateTag)) || "",
+				bytes: totalBytes,
+				createdAt: new Date().toISOString()
+			});
+			selectedBackupPath = destZip;
+			logAction("Created client copy backup: " + destZip + " (" + totalBytes + " bytes)");
+		}
+		catch (err)
+		{
+			if (err && err.name === "AbortError") return;
+			const msg = (err && err.message) || String(err);
+			setStatus(t("clientPrepare.backupErrorPrefix") + msg, "bad");
+			log(t("clientPrepare.backupErrorPrefix") + msg);
+		}
+		finally
+		{
+			if (unlisten) unlisten();
+			setProgress(0, null);
+			await refreshStatus();
+		}
+	});
+
+	restoreBtn.addEventListener("click", () => {
+		deleteConfirmEl.hidden = true;
+		if (!lastResolved)
+		{
+			setStatus(t("clientPrepare.restoreNeedCopy"), "bad");
+			return;
+		}
+		if (!selectedBackupPath)
+		{
+			setStatus(t("clientPrepare.restoreNeedSelect"), "bad");
+			return;
+		}
+		restoreConfirmEl.hidden = false;
+		restoreConfirmEl.innerHTML = "";
+		const prompt = document.createElement("div");
+		prompt.textContent = t("clientPrepare.restoreConfirmPrompt");
+		restoreConfirmEl.appendChild(prompt);
+		const row = document.createElement("div");
+		row.className = "folder-picker-actions";
+		row.style.marginTop = "6px";
+		const yesBtn = document.createElement("button");
+		yesBtn.className = "folder-pick-btn";
+		yesBtn.textContent = t("clientPrepare.restoreConfirmBtn");
+		const cancelBtn = document.createElement("button");
+		cancelBtn.className = "folder-forget-btn";
+		cancelBtn.textContent = t("clientPrepare.restoreCancelBtn");
+		row.appendChild(yesBtn);
+		row.appendChild(cancelBtn);
+		restoreConfirmEl.appendChild(row);
+
+		cancelBtn.addEventListener("click", () => { restoreConfirmEl.hidden = true; });
+		yesBtn.addEventListener("click", async () => {
+			restoreConfirmEl.hidden = true;
+			if (!lastResolved || !selectedBackupPath) return;
+			btn.disabled = true;
+			deleteBtn.disabled = true;
+			backupBtn.disabled = true;
+			restoreBtn.disabled = true;
+			logEl.hidden = false; logEl.innerHTML = "";
+			setProgress(0, null);
+			let unlisten = null;
+			try
+			{
+				const TAURI = window.__TAURI__;
+				unlisten = await TAURI.event.listen("restore-client-progress", (event) => {
+					const p = event.payload;
+					setProgress(p.done_bytes, p.total_bytes);
+					if (p.current_file) log(t("clientPrepare.restoring") + p.current_file);
+				});
+				log(selectedBackupPath + " -> " + lastResolved.destPath);
+				const totalBytes = await TAURI.core.invoke("restore_client_copy_folder", {
+					archive: selectedBackupPath,
+					dest: lastResolved.destPath
+				});
+				log(t("clientPrepare.restoreDone") + lastResolved.destPath + " (" + formatBytesHuman(totalBytes) + ")");
+				setStatus(t("clientPrepare.restoreDone") + lastResolved.destPath, "ok");
+				logAction("Restored client copy backup: " + selectedBackupPath + " -> " + lastResolved.destPath + " (" + totalBytes + " bytes)");
+				invalidateInstallTargetCache();
+				discoverPreexistingModInstalls();
+				reconcileInstalledModsWithClientFolder();
+			}
+			catch (err)
+			{
+				const msg = (err && err.message) || String(err);
+				setStatus(t("clientPrepare.restoreErrorPrefix") + msg, "bad");
+				log(t("clientPrepare.restoreErrorPrefix") + msg);
+			}
+			finally
+			{
+				if (unlisten) unlisten();
+				setProgress(0, null);
+				await refreshStatus();
 			}
 		});
 	});
